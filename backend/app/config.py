@@ -4,7 +4,7 @@ Loads environment variables with validation and type coercion.
 """
 from functools import lru_cache
 from typing import List, Optional
-from pydantic import field_validator, PostresDsn
+from pydantic import field_validator, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
