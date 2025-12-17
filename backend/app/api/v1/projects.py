@@ -220,6 +220,11 @@ async def regenerate_audio(
     session: AsyncSession = Depends(get_session)
 ):
     """Regenerate audio with current cast settings."""
+    from app.graph.nodes.audio_generator import audio_generator_node
+    from app.graph.nodes.video_composer import video_composer_node
+    from app.models import Asset, AssetType
+    from sqlmodel import select, delete
+
     project = await project_crud.get_by_id(
         session=session,
         project_id=project_id,
@@ -229,10 +234,65 @@ async def regenerate_audio(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # TODO: Implement partial pipeline re-run from audio_generator node
-    # For now, return a placeholder response
+    if not project.scripts or not project.casts:
+        raise HTTPException(
+            status_code=400, 
+            detail="Project needs script and cast before regenerating audio"
+        )
 
-    return {"message": "Audio regeneration started", "project_id": str(project_id)}
+    # Get latest script and cast
+    latest_scriptt = max(project.scripts, key=lambda s: s.version)
+    latest_cast = project.casts[-1]
+
+    # Delete existing audio assets
+    await session.execute(
+        delete(Asset).where(
+            Asset.project_id == project_id,
+            Asset.asset_type == AssetType.AUDIO
+        )
+    )
+    await session.commit()
+
+    # Build state for audio regeneration
+    async def regenerate_task():
+        from app.graph.state import GraphState
+        
+        state: GraphState = {
+            "project_id": str(project_id),
+            "user_id": str(DEFAULT_USER_ID),
+            "script_prompt": "",
+            "auto_upload": False,
+            "script_json": latest_script.content,
+            "cast_list": latest_cast.assignments,
+            "audio_files": [],
+            "video_path": None,
+            "youtube_metadata": None,
+            "youtube_video_id": None,
+            "errors": [],
+            "retry_count": 0,
+            "current_step": "regenerating_audio",
+            "progress": 0.3
+        }
+
+        # Run audio generator
+        state = await audio_generator_node(state)
+
+        # Run video composer if audio succeded
+        if state["audio_files"]:
+            state = await video_composer_node(state)
+
+        logger.info(
+            "Audio regeneration complete",
+            project_id=str(project_id),
+            audio_count=len(state["audio_files"])
+        )
+
+    background_tasks.add_task(regenerate_task)
+
+    return {
+        "message": "Audio regeneration started",
+        "project_id": str(project_id)
+    }
 
 
 @router.post("/{project_id}/regenerate-video")
@@ -242,6 +302,10 @@ async def regenerate_video(
     session: AsyncSession = Depends(get_session)
 ):
     """Regenerate video with existing audio."""
+    from app.graph.nodes.video_composer import video_composer_node
+    from app.models import Asset, AssetType
+    from sqlmodel import select, delete
+
     project = await project_crud.get_by_id(
         session=session,
         project_id=project_id,
@@ -250,7 +314,71 @@ async def regenerate_video(
     
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
+
+    # Get audio assets
+    audio_assets = [
+        a for a in project.assets 
+        if a.asset_type == AssetType.AUDIO
+    ]
+
+    if not audio_assets:
+        raise HTTPException(
+            status_code=400,
+            detail="No audio files to compose into video"
+        )
     
-    # TODO: Implement partial pipeline re-run from video_composer node
+    # Get script for metadata
+    if not project.scripts:
+        raise HTTPException(status_code=400, detail="No script found")
+
+    latest_script = max(project.scripts, key=lambda s: s.version)
+
+    # Delete existing video assets
+    await session.execute(
+        delete(Asset).where(
+            Asset.project_id == project_id,
+            Asset.asset_type == AssetType.VIDEO
+        )
+    )
+    await session.commit()
+
+    # Sort audio files by scene index
+    audio_files = sorted(
+        [a.file_path for a in audio_assets],
+        key=lambda p: int(p.split("/")[-1].replace(".mp3", ""))
+    )
+
+    async def regenerate_task():
+        from app.graph.state import GraphState
+
+        state: GraphState = {
+            "project_id": str(project_id),
+            "user_id": str(DEFAULT_USER_ID),
+            "script_prompt": "",
+            "auto_upload": False,
+            "script_json": latest_script.content,
+            "cast_list": {},
+            "audio_files": audio_files,
+            "video_path": None,
+            "youtube_metadata": None,
+            "youtube_video_id": None,
+            "errors": [],
+            "retry_count": 0,
+            "current_step": "regenerating_video",
+            "progress": 0.6
+        }
+
+        state = await video_composer_node(state)
+
+        logger.info(
+            "Video regeneration complete",
+            project_id=str(project_id),
+            video_path=state.get("video_path")
+        )
+
+    background_tasks.add_task(regenerate_task)
     
-    return {"message": "Video regeneration started", "project_id": str(project_id)}
+    return {
+        "message": "Video regeneration started",
+        "project_id": str(project_id)
+    }
