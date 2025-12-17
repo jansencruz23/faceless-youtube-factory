@@ -15,6 +15,10 @@ from app.config import settings
 from app.database import init_db, close_db, check_db_connection
 from app.utils.loggings import configure_logging, get_logger, bind_context, clear_context
 
+from app.api.v1.router import api_router
+
+
+app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 # Configure logging on module load
 configure_logging()
