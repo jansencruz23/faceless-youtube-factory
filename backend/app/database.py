@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import (
     create_async_engine
 )
 from sqlalchemy.pool import NullPool
+from sqlalchemy import text
 from sqlmodel import SQLModel
 from app.config import settings
 
@@ -106,7 +107,7 @@ async def check_db_connection() -> bool:
     """
     try:
         async with async_session_maker() as session:
-            await session.execute("SELECT 1")
+            await session.execute(text("SELECT 1"))
             return True
     except Exception:
         return False

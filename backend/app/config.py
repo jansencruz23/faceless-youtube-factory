@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     
     # Database
-    databae_url: str = "postgresql+asyncpg://youtube_factory:1122qwaszxC@localhost:5432/youtube_factory"
+    database_url: str = "postgresql+asyncpg://youtube_factory:1122qwaszxC@localhost:5432/youtube_factory"
     db_pool_size: int = 20
     db_max_overflow: int = 10
 
@@ -77,7 +77,7 @@ class Settings(BaseSettings):
     @property
     def async_database_url(self) -> str:
         """Ensure the database URL uses asyncpg driver."""
-        url = self.databae_url
+        url = self.database_url
         if url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
