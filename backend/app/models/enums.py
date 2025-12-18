@@ -11,7 +11,7 @@ class ProjectStatus(str, Enum):
     GENERATING_SCRIPT ="generating_script"
     CASTING = "casting"
     GENERATING_AUDIO = "generating_audio"
-    GENERATING_VIDEOS = "generating_video"
+    GENERATING_VIDEO = "generating_video"
     COMPLETED = "completed"
     UPLOADING_YOUTUBE = "uploading_youtube"
     PUBLISHED = "published"

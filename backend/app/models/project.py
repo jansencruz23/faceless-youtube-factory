@@ -25,8 +25,10 @@ class ProjectBase(SQLModel):
     title: str = Field(max_length=255, nullable=False)
     status: ProjectStatus = Field(
         default=ProjectStatus.DRAFT,
-        sa_column=Column(SAEnum(ProjectStatus, name="project_status", create_type=False),
-        nullable=False)
+        sa_column=Column(
+            SAEnum(ProjectStatus, name="project_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
+            nullable=False
+        )
     )
     youtube_video_id: Optional[str] = Field(default=None, max_length=50)
     youtube_url: Optional[str] = Field(default=None, max_length=500)

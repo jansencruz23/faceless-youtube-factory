@@ -62,7 +62,8 @@ async def casting_director_node(state: GraphState) -> GraphState:
             from app.models import Project
 
             # Update project status
-            project = await session.get(Project, state["project_id"])
+            from uuid import UUID as UUIDType
+            project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.GENERATING_AUDIO
                 session.add(project)

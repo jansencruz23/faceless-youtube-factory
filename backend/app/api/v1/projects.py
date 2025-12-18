@@ -241,7 +241,7 @@ async def regenerate_audio(
         )
 
     # Get latest script and cast
-    latest_scriptt = max(project.scripts, key=lambda s: s.version)
+    latest_script = max(project.scripts, key=lambda s: s.version)
     latest_cast = project.casts[-1]
 
     # Delete existing audio assets

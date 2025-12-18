@@ -56,7 +56,8 @@ async def script_writer_node(state: GraphState) -> GraphState:
             from app.models import Script, Project
 
             # Update project status
-            project = await session.get(Project, state["project_id"])
+            from uuid import UUID as UUIDType
+            project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.CASTING
                 session.add(project)
@@ -91,7 +92,8 @@ async def script_writer_node(state: GraphState) -> GraphState:
         if state["retry_count"] >= MAX_RETRIES:
             async with get_session_context() as session:
                 from app.models import Project
-                project = await session.get(Project, state["project_id"])
+                from uuid import UUID as UUIDType
+                project = await session.get(Project, UUIDType(state["project_id"]))
                 if project:
                     project.status = ProjectStatus.FAILED
                     project.error_message = error_msg

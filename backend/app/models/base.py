@@ -9,8 +9,8 @@ from sqlmodel import Field, SQLModel
 
 
 def utc_now() -> datetime:
-    """Get current UTC timestamp."""
-    return datetime.now(timezone.utc)
+    """Get current UTC timestamp (naive, for TIMESTAMP WITHOUT TIME ZONE)."""
+    return datetime.utcnow()
 
 
 class BaseUUIDModel(SQLModel):

@@ -23,7 +23,7 @@ class YouTubeMetadataBase(SQLModel):
     privacy_status: PrivacyStatus = Field(
         default=PrivacyStatus.PRIVATE,
         sa_column=Column(
-            SAEnum(PrivacyStatus, name="privacy_status", create_type=False),
+            SAEnum(PrivacyStatus, name="privacy_status", create_type=False, values_callable=lambda x: [e.value for e in x]),
             nullable=False,
         )
     )

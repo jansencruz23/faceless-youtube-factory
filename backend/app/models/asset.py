@@ -19,7 +19,7 @@ class AssetBase(SQLModel):
     """Shared asset properties."""
     asset_type: AssetType = Field(
         sa_column=Column(
-            SAEnum(AssetType, name="asset_type", create_type=False),
+            SAEnum(AssetType, name="asset_type", create_type=False, values_callable=lambda x: [e.value for e in x]),
             nullable=False
         )
     )

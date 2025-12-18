@@ -40,7 +40,7 @@ class ProjectCRUD:
         if user_id:
             stmt = stmt.where(Project.user_id == user_id)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none
+        return result.scalar_one_or_none()
 
     async def get_with_relations(
         self,
@@ -52,7 +52,7 @@ class ProjectCRUD:
         stmt = (
             select(Project)
             .options(
-                selectinload(Project.script),
+                selectinload(Project.scripts),
                 selectinload(Project.casts),
                 selectinload(Project.assets),
                 selectinload(Project.youtube_metadata),
@@ -62,7 +62,7 @@ class ProjectCRUD:
         if user_id:
             stmt = stmt.where(Project.user_id == user_id)
         result = await session.execute(stmt)
-        return result.scalar_one_or_none
+        return result.scalar_one_or_none()
         
     async def list_by_user(
         self,

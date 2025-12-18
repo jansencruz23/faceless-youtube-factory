@@ -67,7 +67,8 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
                 access_token = new_tokens["token"]
             
             # Update project status
-            project = await session.get(Project, state["project_id"])
+            from uuid import UUID as UUIDType
+            project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.UPLOADING_YOUTUBE
                 session.add(project)
@@ -121,7 +122,8 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
                     connection.is_active = False
                     session.add(connection)
 
-                project = await session.get(Project, state["project_id"])
+                from uuid import UUID as UUIDType
+                project = await session.get(Project, UUIDType(state["project_id"]))
                 if project:
                     project.status = ProjectStatus.COMPLETED  # Revert to completed
                     project.error_message = "YouTube connection expired. Please reconnect."
@@ -132,7 +134,8 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
         elif "403" in str(e) or "quotaExceeded" in str(e).lower():
             # Quota exceeded - mark for retry tomorrow
             async with get_session_context() as session:
-                project = await session.get(Project, state["project_id"])
+                from uuid import UUID as UUIDType
+                project = await session.get(Project, UUIDType(state["project_id"]))
                 if project:
                     project.status = ProjectStatus.COMPLETED
                     project.error_message = "YouTube quota exceeded. Will retry tomorrow."

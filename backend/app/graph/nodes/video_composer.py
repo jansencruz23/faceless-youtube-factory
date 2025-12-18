@@ -78,7 +78,8 @@ async def video_composer_node(state: GraphState) -> GraphState:
             session.add(asset)
 
             # Update project status
-            project = await session.get(Project, state["project_id"])
+            from uuid import UUID as UUIDType
+            project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.COMPLETED
                 session.add(project)
@@ -102,7 +103,8 @@ async def video_composer_node(state: GraphState) -> GraphState:
         # Mark project as failed
         async with get_session_context() as session:
             from app.models import Project
-            project = await session.get(Project, state["project_id"])
+            from uuid import UUID as UUIDType
+            project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.FAILED
                 project.error_message = error_msg
