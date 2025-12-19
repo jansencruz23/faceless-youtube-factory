@@ -30,7 +30,7 @@ export async function createProject(data: {
     script_prompt: string;
     auto_upload: boolean;
 }): Promise<Project> {
-    return fetchAPI("/api/v1/projeects", {
+    return fetchAPI("/api/v1/projects", {
         method: "POST",
         body: JSON.stringify(data),
     });
