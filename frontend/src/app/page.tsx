@@ -1,65 +1,115 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useQuery } from "@tanstack/react-query";
+import Link from "next/link";
+import { listProjects } from "@/lib/api";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ProjectStatus } from "@/types";
+import { Play, Youtube, AlertCircle, Clock, CheckCircle2, Loader2 } from "lucide-react";
+
+const statusConfig: Record<ProjectStatus, { label: string; variant: "default" | "secondary" | "destructive" | "success" | "warning"; icon: React.ElementType }> = {
+  draft: { label: "Draft", variant: "secondary", icon: Clock },
+  generating_script: { label: "Writing Script", variant: "default", icon: Loader2 },
+  casting: { label: "Casting", variant: "default", icon: Loader2 },
+  generating_audio: { label: "Generating Audio", variant: "default", icon: Loader2 },
+  generating_video: { label: "Composing Video", variant: "default", icon: Loader2 },
+  completed: { label: "Completed", variant: "success", icon: CheckCircle2 },
+  uploading_youtube: { label: "Uploading", variant: "warning", icon: Youtube },
+  published: { label: "Published", variant: "success", icon: Youtube },
+  failed: { label: "Failed", variant: "destructive", icon: AlertCircle },
+};
+
+export default function DashboardPage() {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ["projects"],
+    queryFn: () => listProjects(),
+    refetchInterval: 5000,
+  });
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="border-destructive">
+        <CardContent className="pt-6">
+          <div className="flex items-center gap-2 text-destructive">
+            <AlertCircle className="h-5 w-5" />
+            <p>Failed to load projects: {(error as Error).message}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold">Your Projects</h1>
+        <p className="text-muted-foreground">
+          {data?.total || 0} project{data?.total !== 1 ? "s" : ""}
+        </p>
+      </div>
+      {data?.items.length === 0 ? (
+        <Card>
+          <CardContent className="flex flex-col items-center justify-center py-16">
+            <Play className="h-12 w-12 text-muted-foreground mb-4" />
+            <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
+            <p className="text-muted-foreground mb-4">Create your first AI-generated video</p>
+            <Link href="/projects/new">
+              <Button>Create Project</Button>
+            </Link>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {data?.items.map((project) => {
+            const config = statusConfig[project.status];
+            const StatusIcon = config.icon;
+            const isProcessing = ["generating_script", "casting", "generating_audio", "generating_video", "uploading_youtube"].includes(project.status);
+            return (
+              <Link key={project.id} href={`/projects/${project.id}`}>
+                <Card className="hover:border-primary/50 transition-colors cursor-pointer">
+                  <CardContent className="flex items-center justify-between py-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex flex-col">
+                        <h3 className="font-semibold">{project.title}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          {new Date(project.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      {project.youtube_url && (
+                        <a
+                          href={project.youtube_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-red-500 hover:text-red-400"
+                        >
+                          <Youtube className="h-5 w-5" />
+                        </a>
+                      )}
+                      <Badge variant={config.variant} className="gap-1">
+                        <StatusIcon className={`h-3 w-3 ${isProcessing ? "animate-spin" : ""}`} />
+                        {config.label}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            );
+          })}
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      )}
     </div>
   );
 }
