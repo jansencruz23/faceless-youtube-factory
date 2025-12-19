@@ -85,7 +85,7 @@ export interface YouTubeMetadata {
     title: string;
     description: string;
     tags: string[];
-    categoru_id: string;
+    category_id: string;
 }
 
 // WebSocket event types
