@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProjectDetail, Voice, VoiceSettings } from "@/types";
-import { listVoices, updateCast, previewVoice, regenerateAudio } from "@/lib/api";
+import { listVoices, updateCast, previewVoice, regenerateAudio, getStaticUrl } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -55,7 +55,7 @@ export function CastingStudio({ project }: CastingStudioProps) {
             }),
         onSuccess: (data, variables) => {
             if (audioRef.current) {
-                audioRef.current.src = data.audio_url;
+                audioRef.current.src = getStaticUrl(data.audio_url);
                 audioRef.current.play();
                 setPlayingCharacter(variables.character);
             }

@@ -1,6 +1,17 @@
 import { Project, ProjectDetail, Voice, YouTubeConnection, YouTubeMetadata} from "@/types";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+export const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+
+// Helper to build full URLs for static files served by the backend
+export function getStaticUrl(path: string): string {
+    if (!path) return "";
+    // If already a full URL, return as-is
+    if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path;
+    }
+    // Prepend API base to relative paths
+    return `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+}
 
 async function fetchAPI<T>(
     endpoint: string,

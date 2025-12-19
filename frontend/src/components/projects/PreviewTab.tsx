@@ -1,6 +1,7 @@
 "use client";
 
 import { ProjectDetail } from "@/types";
+import { getStaticUrl } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Play, Film, Volume2 } from "lucide-react";
@@ -31,7 +32,7 @@ export function PreviewTab({ project }: PreviewTabProps) {
                 <Card className="overflow-hidden">
                     <div className="aspect-video bg-black">
                         <video controls className="w-full h-full">
-                            <source src={videoAsset.url} type="video/mp4" />
+                            <source src={getStaticUrl(videoAsset.url)} type="video/mp4" />
                         </video>
                     </div>
                     <CardContent className="py-4">
@@ -63,7 +64,7 @@ export function PreviewTab({ project }: PreviewTabProps) {
                                     <span className="text-sm text-muted-foreground w-8">#{index + 1}</span>
                                     {asset.character_name && <Badge variant="outline">{asset.character_name}</Badge>}
                                     <audio controls className="flex-1 h-8">
-                                        <source src={asset.url} type="audio/mpeg" />
+                                        <source src={getStaticUrl(asset.url)} type="audio/mpeg" />
                                     </audio>
                                 </div>
                             ))}
