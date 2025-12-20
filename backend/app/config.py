@@ -2,15 +2,17 @@
 Application configuration using Pydantic Settings.
 Loads environment variables with validation and type coercion.
 """
+
 from functools import lru_cache
 from typing import List, Optional
 from pydantic import field_validator, PostgresDsn
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
-    
+
     All settings have sensible defaults for development.
     Production deployments MUST set sensitive values via environment.
     """
@@ -26,7 +28,7 @@ class Settings(BaseSettings):
     app_name: str = "Faceless YouTube Factory"
     debug: bool = True
     api_v1_prefix: str = "/api/v1"
-    
+
     # Database
     database_url: str = "postgresql+asyncpg://youtube_factory:1122qwaszxC@localhost:5432/youtube_factory"
     db_pool_size: int = 20
@@ -74,6 +76,13 @@ class Settings(BaseSettings):
     # Validation
     max_script_prompt_length: int = 5000
 
+    # Image Generation (Flux Schnell)
+    flux_model: str = "black-forest-labs/FLUX.1-schnell"
+    image_width: int = 1280
+    image_height: int = 720
+    image_num_steps: int = 4  # Schnell uses few steps
+    enable_image_generation: bool = True
+
     @property
     def async_database_url(self) -> str:
         """Ensure the database URL uses asyncpg driver."""
@@ -82,15 +91,17 @@ class Settings(BaseSettings):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         return url
 
+
 @lru_cache()
 def get_settings() -> Settings:
     """
     Get cached application settings.
-    
+
     Uses lru_cache to avoid re-reading environment on every call.
     Clear cache in tests with: get_settings.cache_clear()
     """
     return Settings()
+
 
 # Export a settings instance
 settings = get_settings()
