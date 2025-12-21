@@ -25,29 +25,68 @@ class ImageService:
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.pipe = None
         self._model_loaded = False
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+
+        # Log GPU status on initialization
+        if torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
+            logger.info(f"GPU available: {gpu_name} ({gpu_memory:.1f} GB VRAM)")
+        else:
+            logger.warning(
+                "No GPU available! Image generation will be VERY slow on CPU."
+            )
 
     def _load_model(self):
         """Lazy load the SDXL model to save VRAM when not in use."""
         if self._model_loaded:
             return
 
+        import time
+
         try:
             from diffusers import StableDiffusionXLPipeline
 
-            logger.info("Loading Stable Diffusion XL model...")
-
-            self.pipe = StableDiffusionXLPipeline.from_pretrained(
-                "stabilityai/stable-diffusion-xl-base-1.0",
-                torch_dtype=torch.float16,
-                use_safetensors=True,
-                variant="fp16",
+            logger.info(
+                f"Loading Stable Diffusion XL model on {self.device.upper()}..."
+            )
+            logger.info(
+                "This may take 10-30 minutes on first run (downloading ~6.5GB model)..."
             )
 
-            self.pipe = self.pipe.to("cuda")
-            self.pipe.enable_attention_slicing()
+            start_time = time.time()
 
+            if self.device == "cuda":
+                self.pipe = StableDiffusionXLPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    torch_dtype=torch.float16,
+                    use_safetensors=True,
+                    variant="fp16",
+                )
+
+                download_time = time.time() - start_time
+                logger.info(
+                    f"Model downloaded/loaded from cache in {download_time:.1f}s"
+                )
+
+                logger.info("Moving model to GPU...")
+                self.pipe = self.pipe.to("cuda")
+                self.pipe.enable_attention_slicing()
+
+                # Log VRAM usage after loading
+                allocated = torch.cuda.memory_allocated(0) / (1024**3)
+                logger.info(f"Model on GPU. VRAM used: {allocated:.2f} GB")
+            else:
+                # CPU fallback (very slow)
+                self.pipe = StableDiffusionXLPipeline.from_pretrained(
+                    "stabilityai/stable-diffusion-xl-base-1.0",
+                    torch_dtype=torch.float32,
+                    use_safetensors=True,
+                )
+
+            total_time = time.time() - start_time
             self._model_loaded = True
-            logger.info("SDXL model loaded successfully")
+            logger.info(f"SDXL model ready! Total load time: {total_time:.1f}s")
 
         except Exception as e:
             logger.error("Failed to load SDXL model", error=str(e))
@@ -75,8 +114,11 @@ class ImageService:
         """Synchronous image generation (runs in thread pool)."""
         self._load_model()
 
+        import time
+
         try:
             logger.info(f"Generating image: {prompt[:50]}...")
+            start_time = time.time()
 
             image = self.pipe(
                 prompt=prompt,
@@ -85,6 +127,9 @@ class ImageService:
                 num_inference_steps=num_steps,
                 guidance_scale=7.5,
             ).images[0]
+
+            gen_time = time.time() - start_time
+            logger.info(f"Image generated in {gen_time:.1f}s")
 
             # Save image
             image.save(str(output_path), quality=95)
