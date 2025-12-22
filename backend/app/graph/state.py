@@ -47,3 +47,9 @@ class GraphState(TypedDict):
 
     # Progress tracking (0.0 to 1.0)
     progress: float
+
+    # Additional states for vertical video
+    video_format: str  # "horizontal" or "vertical"
+    background_video_url: Optional[str]
+    background_music_url: Optional[str]
+    music_volume: float
