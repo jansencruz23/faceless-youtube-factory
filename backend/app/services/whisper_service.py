@@ -24,11 +24,11 @@ def get_whisper_model():
 
             # Use 'tiny' model for speed, 'base' for better accuracy
             # Model will be downloaded on first use (~75MB for tiny)
-            logger.info("Loading Whisper model (base)...")
+            logger.info("Loading Whisper model (tiny, CPU mode)...")
             _whisper_model = WhisperModel(
-                "base",  # Options: tiny, base, small, medium, large-v3
-                device="cuda",  # Use "cuda" if you have GPU
-                compute_type="int8",  # Faster inference
+                "tiny",  # Use tiny for faster CPU inference
+                device="cpu",  # Use CPU to avoid CUDA issues
+                compute_type="int8",  # Faster inference on CPU
             )
             logger.info("Whisper model loaded successfully")
         except Exception as e:

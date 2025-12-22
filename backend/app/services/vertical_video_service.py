@@ -1,6 +1,6 @@
 """
 Vertical Video Service for Shorts/TikTok.
-Optimized for fast rendering with FFmpeg-based composition.
+Uses Whisper for word-level timestamps and animated ASS subtitles.
 """
 
 import asyncio
@@ -21,7 +21,7 @@ logger = get_logger(__name__)
 # Dedicated executor for video processing
 vertical_video_executor = ThreadPoolExecutor(max_workers=1)
 
-# Video dimensions (9:16 vertical) - use 720p for faster rendering
+# Video dimensions (9:16 vertical)
 WIDTH = 720
 HEIGHT = 1280
 
@@ -48,7 +48,7 @@ class VerticalVideoService:
         music_volume: float = 0.3,
         enable_captions: bool = True,
     ) -> str:
-        """Create a vertical video optimized for speed."""
+        """Create a vertical video with Whisper-powered captions."""
         try:
             output_path = self.output_dir / f"{project_id}.mp4"
 
@@ -67,7 +67,7 @@ class VerticalVideoService:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 vertical_video_executor,
-                self._compose_fast,
+                self._compose_with_whisper,
                 project_id,
                 audio_paths,
                 meta_data,
@@ -87,7 +87,7 @@ class VerticalVideoService:
             )
             raise
 
-    def _compose_fast(
+    def _compose_with_whisper(
         self,
         project_id: str,
         audio_paths: List[Path],
@@ -98,54 +98,27 @@ class VerticalVideoService:
         music_volume: float,
         enable_captions: bool,
     ) -> None:
-        """Fast composition using FFmpeg directly."""
+        """Compose video with Whisper transcription for accurate captions."""
         start_time = time.time()
-
-        logger.info(f"[1/4] Processing {len(audio_paths)} audio files...")
 
         valid_audio_paths = [p for p in audio_paths if p.exists()]
         if not valid_audio_paths:
             raise ValueError("No valid audio files found")
 
-        subtitle_entries = []
-        current_time = 0.0
-        audio_durations = []
-
-        for i, audio_path in enumerate(valid_audio_paths):
-            audio = AudioFileClip(str(audio_path))
-            duration = audio.duration
-            audio_durations.append(duration)
-
-            if enable_captions and i < len(meta_data):
-                line = meta_data[i].get("line", "")
-                words = line.split()
-                if words:
-                    word_groups = []
-                    for k in range(0, len(words), 2):
-                        group = " ".join(words[k : k + 2])
-                        word_groups.append(group)
-
-                    time_per_group = duration / len(word_groups)
-                    for j, group in enumerate(word_groups):
-                        start = current_time + (j * time_per_group)
-                        end = start + time_per_group
-                        subtitle_entries.append(
-                            {"start": start, "end": end, "text": group.upper()}
-                        )
-
-            current_time += duration
-            audio.close()
-            logger.info(f"  Audio {i + 1}/{len(valid_audio_paths)}: {duration:.1f}s")
-
-        total_duration = sum(audio_durations)
-        logger.info(f"  Total duration: {total_duration:.1f}s")
-
-        logger.info("[2/4] Merging audio...")
+        # Step 1: Merge all audio
+        logger.info(f"[1/5] Merging {len(valid_audio_paths)} audio files...")
         merged_audio_path = self.temp_dir / f"{project_id}_merged.mp3"
         self._merge_audio_ffmpeg(valid_audio_paths, merged_audio_path)
 
+        # Get total duration
+        audio = AudioFileClip(str(merged_audio_path))
+        total_duration = audio.duration
+        audio.close()
+        logger.info(f"  Total duration: {total_duration:.1f}s")
+
+        # Step 2: Mix with background music if provided
         if bg_music_path and bg_music_path.exists():
-            logger.info("  Adding background music...")
+            logger.info("[2/5] Adding background music...")
             final_audio_path = self.temp_dir / f"{project_id}_final_audio.mp3"
             self._mix_audio_with_music(
                 merged_audio_path,
@@ -156,8 +129,11 @@ class VerticalVideoService:
             )
             merged_audio_path.unlink()
             merged_audio_path = final_audio_path
+        else:
+            logger.info("[2/5] No background music, skipping...")
 
-        logger.info("[3/4] Creating video with FFmpeg...")
+        # Step 3: Create base video
+        logger.info("[3/5] Creating base video...")
         temp_video_path = self.temp_dir / f"{project_id}_temp.mp4"
 
         if bg_video_path and bg_video_path.exists():
@@ -169,22 +145,110 @@ class VerticalVideoService:
                 merged_audio_path, temp_video_path, total_duration
             )
 
-        if enable_captions and subtitle_entries:
-            logger.info("[4/4] Burning subtitles...")
-            ass_path = self.temp_dir / f"{project_id}.ass"
-            self._generate_ass_subtitles(subtitle_entries, ass_path)
-            self._burn_subtitles_ffmpeg(temp_video_path, ass_path, output_path)
-            temp_video_path.unlink()
-            ass_path.unlink()
+        # Step 4: Transcribe with Whisper for word-level timestamps
+        if enable_captions:
+            logger.info("[4/5] Transcribing audio with Whisper...")
+            try:
+                from app.services.whisper_service import (
+                    transcribe_audio_with_timestamps,
+                )
+
+                words = transcribe_audio_with_timestamps(merged_audio_path)
+
+                if words:
+                    logger.info(f"  Got {len(words)} words with timestamps")
+
+                    # Generate animated ASS subtitles
+                    ass_path = self.temp_dir / f"{project_id}.ass"
+                    self._generate_animated_ass(words, ass_path)
+
+                    # Burn subtitles
+                    logger.info("[5/5] Burning animated captions...")
+                    self._burn_subtitles_ffmpeg(temp_video_path, ass_path, output_path)
+
+                    temp_video_path.unlink()
+                    ass_path.unlink()
+                else:
+                    logger.warning(
+                        "  No words transcribed, using video without captions"
+                    )
+                    shutil.move(str(temp_video_path), str(output_path))
+
+            except Exception as e:
+                logger.error(f"Whisper transcription failed: {e}")
+                logger.info("[5/5] Falling back to no captions...")
+                shutil.move(str(temp_video_path), str(output_path))
         else:
-            logger.info("[4/4] No subtitles, finalizing...")
+            logger.info("[4/5] Captions disabled, skipping...")
+            logger.info("[5/5] Finalizing...")
             shutil.move(str(temp_video_path), str(output_path))
 
+        # Cleanup
         if merged_audio_path.exists():
             merged_audio_path.unlink()
 
         elapsed = time.time() - start_time
         logger.info(f"Video created in {elapsed:.1f}s: {output_path}")
+
+    def _generate_animated_ass(self, words: List[dict], output_path: Path) -> None:
+        """Generate ASS subtitles with popup animation effect."""
+
+        # ASS header with animated style
+        # Popup effect: scale from 0 to 100 quickly, slight overshoot
+        ass_content = f"""[Script Info]
+Title: Animated Captions
+ScriptType: v4.00+
+PlayResX: {WIDTH}
+PlayResY: {HEIGHT}
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Pop,Impact,80,&H00FFFFFF,&H000000FF,&H00000000,&HAA000000,1,0,0,0,100,100,0,0,1,4,2,5,10,10,300,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+
+        for word_info in words:
+            start_time = self._seconds_to_ass_time(word_info["start"])
+            end_time = self._seconds_to_ass_time(word_info["end"])
+            word = word_info["word"].upper()
+
+            # Clean the word
+            word = word.replace("\\", "").replace("{", "").replace("}", "")
+
+            # Popup animation effect:
+            # - Start at scale 0
+            # - Pop to 110% in 0.05s
+            # - Settle to 100% by 0.1s
+            duration_ms = int((word_info["end"] - word_info["start"]) * 1000)
+            pop_duration = min(100, duration_ms // 3)  # 100ms or 1/3 of word duration
+
+            # ASS animation tags:
+            # \t(0,50,\fscx110\fscy110) - scale up to 110% in 50ms
+            # \t(50,100,\fscx100\fscy100) - settle to 100%
+            animated_text = (
+                f"{{\\fscx0\\fscy0\\t(0,{pop_duration // 2},\\fscx110\\fscy110)"
+                f"\\t({pop_duration // 2},{pop_duration},\\fscx100\\fscy100)}}{word}"
+            )
+
+            ass_content += (
+                f"Dialogue: 0,{start_time},{end_time},Pop,,0,0,0,,{animated_text}\n"
+            )
+
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write(ass_content)
+
+        logger.info(f"  Generated animated ASS with {len(words)} words")
+
+    def _seconds_to_ass_time(self, seconds: float) -> str:
+        """Convert seconds to ASS time format (H:MM:SS.CC)"""
+        hours = int(seconds // 3600)
+        minutes = int((seconds % 3600) // 60)
+        secs = int(seconds % 60)
+        centisecs = int((seconds % 1) * 100)
+        return f"{hours}:{minutes:02d}:{secs:02d}.{centisecs:02d}"
 
     def _merge_audio_ffmpeg(self, audio_paths: List[Path], output_path: Path) -> None:
         """Merge multiple audio files using FFmpeg filter_complex."""
@@ -205,7 +269,6 @@ class VerticalVideoService:
             + ["-filter_complex", filter_str, "-map", "[out]", str(output_path)]
         )
 
-        logger.info(f"  Merging {len(audio_paths)} audio files...")
         result = subprocess.run(cmd, capture_output=True, text=True)
 
         if result.returncode != 0:
@@ -241,7 +304,7 @@ class VerticalVideoService:
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            logger.warning(f"Music mixing failed, using voice only")
+            logger.warning(f"Music mixing failed")
             shutil.copy(voice_path, output_path)
 
     def _create_solid_video_ffmpeg(
@@ -311,51 +374,20 @@ class VerticalVideoService:
             logger.error(f"Video creation failed: {result.stderr}")
             raise RuntimeError("Failed to create video with background")
 
-    def _generate_ass_subtitles(self, entries: List[dict], output_path: Path) -> None:
-        """Generate ASS subtitle file."""
-        ass_content = f"""[Script Info]
-Title: Generated Subtitles
-ScriptType: v4.00+
-PlayResX: {WIDTH}
-PlayResY: {HEIGHT}
-WrapStyle: 0
-
-[V4+ Styles]
-Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Impact,70,&H00FFFFFF,&H000000FF,&H00000000,&H80000000,1,0,0,0,100,100,0,0,1,4,0,5,10,10,300,1
-
-[Events]
-Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
-"""
-        for entry in entries:
-            start_time = self._seconds_to_ass_time(entry["start"])
-            end_time = self._seconds_to_ass_time(entry["end"])
-            text = (
-                entry["text"]
-                .replace("\\", "\\\\")
-                .replace("{", "\\{")
-                .replace("}", "\\}")
-            )
-            ass_content += (
-                f"Dialogue: 0,{start_time},{end_time},Default,,0,0,0,,{text}\n"
-            )
-
-        with open(output_path, "w", encoding="utf-8") as f:
-            f.write(ass_content)
-
-    def _seconds_to_ass_time(self, seconds: float) -> str:
-        """Convert seconds to ASS time format."""
-        hours = int(seconds // 3600)
-        minutes = int((seconds % 3600) // 60)
-        secs = int(seconds % 60)
-        centisecs = int((seconds % 1) * 100)
-        return f"{hours}:{minutes:02d}:{secs:02d}.{centisecs:02d}"
-
     def _burn_subtitles_ffmpeg(
         self, input_path: Path, ass_path: Path, output_path: Path
     ) -> None:
         """Burn ASS subtitles into video."""
-        ass_path_escaped = str(ass_path).replace("\\", "/").replace(":", "\\:")
+        import tempfile
+        import os
+
+        # Copy ASS to a simple temp path (avoids Windows path escaping issues)
+        temp_dir = tempfile.gettempdir()
+        simple_ass_path = Path(temp_dir) / "captions.ass"
+        shutil.copy(ass_path, simple_ass_path)
+
+        # Use forward slashes and escape colon
+        ass_escaped = str(simple_ass_path).replace("\\", "/").replace(":", "\\:")
 
         cmd = [
             "ffmpeg",
@@ -365,7 +397,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             "-i",
             str(input_path),
             "-vf",
-            f"ass='{ass_path_escaped}'",
+            f"ass='{ass_escaped}'",
             "-c:a",
             "copy",
             "-c:v",
@@ -379,10 +411,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             str(output_path),
         ]
 
+        logger.info(f"  FFmpeg command: {' '.join(cmd[:8])}...")
         result = subprocess.run(cmd, capture_output=True, text=True)
+
+        # Clean up temp ASS
+        try:
+            simple_ass_path.unlink()
+        except:
+            pass
+
         if result.returncode != 0:
-            logger.warning(f"Subtitle burning failed")
+            logger.error(f"Subtitle burning failed!")
+            logger.error(f"  FFmpeg stderr: {result.stderr[:500]}")
             shutil.copy(input_path, output_path)
+        else:
+            logger.info("  Subtitles burned successfully")
 
 
 # Singleton instance
