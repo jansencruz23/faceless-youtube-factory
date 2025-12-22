@@ -16,7 +16,6 @@ backend/static/
 **/static/shorts/
 **/static/presets/
 
-
 # Editor/IDE specific files
 .idea/
 .vscode/
