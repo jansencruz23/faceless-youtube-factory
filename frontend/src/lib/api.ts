@@ -173,3 +173,38 @@ export async function uploadToYouTube(
     });
 }
 
+export async function uploadVideo(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const response = await fetch(`${baseUrl}/api/v1/projects/upload-video`, {
+        method: "POST",
+        body: formData,
+    });
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Upload failed" }));
+        throw new Error(error.detail);
+    }
+    
+    return response.json();
+}
+
+export async function uploadMusic(file: File): Promise<{ url: string }> {
+    const formData = new FormData();
+    formData.append("file", file);
+    
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+    const response = await fetch(`${baseUrl}/api/v1/projects/upload-music`, {
+        method: "POST",
+        body: formData,
+    });
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: "Upload failed" }));
+        throw new Error(error.detail);
+    }
+    
+    return response.json();
+}
