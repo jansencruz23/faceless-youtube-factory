@@ -123,8 +123,10 @@ export default function NewProjectPage() {
             // For vertical, determine background video
             if (backgroundMode === "preset" && selectedPreset) {
                 backgroundVideoUrl = selectedPreset;
+                finalImageMode = "none"; // Skip image generation when using video
             } else if (backgroundMode === "upload" && uploadedVideoUrl) {
                 backgroundVideoUrl = uploadedVideoUrl;
+                finalImageMode = "none"; // Skip image generation when using video
             } else if (backgroundMode === "image") {
                 finalImageMode = "single";
             } else {

@@ -351,7 +351,7 @@ CHARACTERS TO CAST:
 {chr(10).join(character_summaries)}
 
 For each character, select a voice that matches:
-1. The character's apparent personality based on their name and dialogue
+1. The character's name and apparent personality based on their name and dialogue
 2. The tone and style of their speech
 3. Ensure voice variety - don't assign the same voice to multiple characters
 

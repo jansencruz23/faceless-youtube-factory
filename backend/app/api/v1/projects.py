@@ -194,6 +194,34 @@ async def list_projects(
     )
 
 
+@router.get("/preset-videos")
+async def list_preset_videos():
+    """
+    List available preset background videos for shorts.
+
+    Place your preset videos in: static/presets/videos/
+    """
+    presets_dir = Path(settings.static_dir) / "presets" / "videos"
+    presets_dir.mkdir(parents=True, exist_ok=True)
+
+    video_extensions = [".mp4", ".webm", ".mov"]
+    presets = []
+
+    for video_file in presets_dir.iterdir():
+        if video_file.suffix.lower() in video_extensions:
+            display_name = video_file.stem.replace("_", " ").replace("-", " ").title()
+            presets.append(
+                {
+                    "id": video_file.stem,
+                    "name": display_name,
+                    "url": f"presets/videos/{video_file.name}",
+                    "thumbnail": None,
+                }
+            )
+
+    return {"presets": presets}
+
+
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: UUID, session: AsyncSession = Depends(get_session)):
     """Get project details with all related data."""
@@ -655,33 +683,3 @@ async def upload_music(file: UploadFile = File(...)):
         shutil.copyfileobj(file.file, buffer)
 
     return {"url": f"uploads/music/{filename}"}
-
-
-@router.get("/preset-videos")
-async def list_preset_videos():
-    """
-    List available preset background videos for shorts.
-
-    Place your preset videos in: static/presets/videos/
-    Videos should be named descriptively (e.g., minecraft_parkour.mp4, subway_surfers.mp4)
-    """
-    presets_dir = Path(settings.static_dir) / "presets" / "videos"
-    presets_dir.mkdir(parents=True, exist_ok=True)
-
-    video_extensions = [".mp4", ".webm", ".mov"]
-    presets = []
-
-    for video_file in presets_dir.iterdir():
-        if video_file.suffix.lower() in video_extensions:
-            # Create display name from filename
-            display_name = video_file.stem.replace("_", " ").replace("-", " ").title()
-            presets.append(
-                {
-                    "id": video_file.stem,
-                    "name": display_name,
-                    "url": f"presets/videos/{video_file.name}",
-                    "thumbnail": None,  # Could add thumbnail support later
-                }
-            )
-
-    return {"presets": presets}
