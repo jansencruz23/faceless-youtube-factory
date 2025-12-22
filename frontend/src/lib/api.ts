@@ -61,8 +61,18 @@ export interface PresetVideo {
     thumbnail: string | null;
 }
 
+export interface PresetMusic {
+    id: string;
+    name: string;
+    url: string;
+}
+
 export async function getPresetVideos(): Promise<{ presets: PresetVideo[] }> {
     return fetchAPI("/api/v1/projects/preset-videos");
+}
+
+export async function getPresetMusic(): Promise<{ presets: PresetMusic[] }> {
+    return fetchAPI("/api/v1/projects/preset-music");
 }
 
 export async function uploadBackgroundImage(file: File): Promise<{ url: string }> {

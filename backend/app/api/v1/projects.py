@@ -222,6 +222,33 @@ async def list_preset_videos():
     return {"presets": presets}
 
 
+@router.get("/preset-music")
+async def list_preset_music():
+    """
+    List available preset background music for shorts.
+
+    Place your music files in: static/presets/music/
+    """
+    presets_dir = Path(settings.static_dir) / "presets" / "music"
+    presets_dir.mkdir(parents=True, exist_ok=True)
+
+    audio_extensions = [".mp3", ".wav", ".m4a", ".ogg"]
+    presets = []
+
+    for audio_file in presets_dir.iterdir():
+        if audio_file.suffix.lower() in audio_extensions:
+            display_name = audio_file.stem.replace("_", " ").replace("-", " ").title()
+            presets.append(
+                {
+                    "id": audio_file.stem,
+                    "name": display_name,
+                    "url": f"presets/music/{audio_file.name}",
+                }
+            )
+
+    return {"presets": presets}
+
+
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
 async def get_project(project_id: UUID, session: AsyncSession = Depends(get_session)):
     """Get project details with all related data."""

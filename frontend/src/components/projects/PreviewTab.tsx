@@ -30,16 +30,31 @@ export function PreviewTab({ project }: PreviewTabProps) {
             {/* Video Player */}
             {videoAsset && (
                 <Card className="overflow-hidden">
-                    <div className="aspect-video bg-black">
-                        <video controls className="w-full h-full" key={project.updated_at}>
-                            <source src={`${getStaticUrl(videoAsset.url)}?t=${new Date(project.updated_at).getTime()}`} type="video/mp4" />
-                        </video>
-                    </div>
+                    {/* Detect vertical video by URL (shorts folder) */}
+                    {videoAsset.url.includes("shorts/") ? (
+                        // Vertical video - smaller, centered
+                        <div className="flex justify-center bg-black py-4">
+                            <div className="w-48 aspect-[9/16]">
+                                <video controls className="w-full h-full rounded-lg" key={project.updated_at}>
+                                    <source src={`${getStaticUrl(videoAsset.url)}?t=${new Date(project.updated_at).getTime()}`} type="video/mp4" />
+                                </video>
+                            </div>
+                        </div>
+                    ) : (
+                        // Horizontal video - full width
+                        <div className="aspect-video bg-black">
+                            <video controls className="w-full h-full" key={project.updated_at}>
+                                <source src={`${getStaticUrl(videoAsset.url)}?t=${new Date(project.updated_at).getTime()}`} type="video/mp4" />
+                            </video>
+                        </div>
+                    )}
                     <CardContent className="py-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <Play className="h-4 w-4 text-primary" />
-                                <span className="font-medium">Final Video</span>
+                                <span className="font-medium">
+                                    {videoAsset.url.includes("shorts/") ? "Short Video" : "Final Video"}
+                                </span>
                             </div>
                             {videoAsset.file_size_bytes && (
                                 <Badge variant="secondary">

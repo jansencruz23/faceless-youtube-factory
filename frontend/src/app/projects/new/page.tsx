@@ -3,7 +3,7 @@
 import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { createProject, getYouTubeConnection, uploadBackgroundImage, uploadVideo, uploadMusic, getPresetVideos } from "@/lib/api";
+import { createProject, getYouTubeConnection, uploadBackgroundImage, uploadVideo, uploadMusic, getPresetVideos, getPresetMusic } from "@/lib/api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +51,11 @@ export default function NewProjectPage() {
     const { data: presetsData } = useQuery({
         queryKey: ["preset-videos"],
         queryFn: getPresetVideos,
+    });
+
+    const { data: musicPresetsData } = useQuery({
+        queryKey: ["preset-music"],
+        queryFn: getPresetMusic,
     });
 
     const createMutation = useMutation({
@@ -448,36 +453,59 @@ export default function NewProjectPage() {
                                         <Music className="h-4 w-4" />
                                         Background Music (Optional)
                                     </label>
-                                    <button
-                                        type="button"
-                                        onClick={() => musicInputRef.current?.click()}
-                                        disabled={isUploading}
-                                        className="w-full p-3 rounded-lg border border-dashed border-border hover:border-primary/50 transition-colors flex items-center justify-center gap-2"
-                                    >
-                                        {uploadingType === "music" ? (
-                                            <Loader2 className="h-5 w-5 animate-spin" />
-                                        ) : uploadedMusicUrl ? (
-                                            <>
-                                                <Music className="h-5 w-5 text-primary" />
-                                                <span>Music uploaded ✓</span>
-                                                <button
-                                                    type="button"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setUploadedMusicUrl(null);
-                                                    }}
-                                                    className="ml-2 p-1 hover:bg-secondary rounded"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </button>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Upload className="h-4 w-4" />
-                                                <span className="text-sm">Upload music</span>
-                                            </>
-                                        )}
-                                    </button>
+
+                                    {/* Music Presets */}
+                                    {musicPresetsData?.presets && musicPresetsData.presets.length > 0 && !uploadedMusicUrl && (
+                                        <div className="space-y-2">
+                                            <span className="text-xs text-muted-foreground">Select from presets:</span>
+                                            <div className="grid grid-cols-2 gap-2">
+                                                {musicPresetsData.presets.map((preset) => (
+                                                    <button
+                                                        key={preset.id}
+                                                        type="button"
+                                                        onClick={() => setUploadedMusicUrl(preset.url)}
+                                                        className={`p-2 rounded-lg border transition-colors text-left text-sm ${uploadedMusicUrl === preset.url
+                                                            ? "border-primary bg-primary/10"
+                                                            : "border-border hover:border-primary/50"
+                                                            }`}
+                                                    >
+                                                        <Music className="h-3 w-3 inline mr-2" />
+                                                        {preset.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {uploadedMusicUrl ? (
+                                        <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/50">
+                                            <Music className="h-5 w-5 text-primary" />
+                                            <span className="flex-1">Music selected ✓</span>
+                                            <button
+                                                type="button"
+                                                onClick={() => setUploadedMusicUrl(null)}
+                                                className="p-1 hover:bg-secondary rounded"
+                                            >
+                                                <X className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <button
+                                            type="button"
+                                            onClick={() => musicInputRef.current?.click()}
+                                            disabled={isUploading}
+                                            className="w-full p-3 rounded-lg border border-dashed border-border hover:border-primary/50 transition-colors flex items-center justify-center gap-2"
+                                        >
+                                            {uploadingType === "music" ? (
+                                                <Loader2 className="h-5 w-5 animate-spin" />
+                                            ) : (
+                                                <>
+                                                    <Upload className="h-4 w-4" />
+                                                    <span className="text-sm">Or upload your own</span>
+                                                </>
+                                            )}
+                                        </button>
+                                    )}
                                     <input
                                         ref={musicInputRef}
                                         type="file"

@@ -215,6 +215,7 @@ class VerticalVideoService:
         # Split into words
         words = text.split()
         if not words:
+            logger.warning("No words to create captions for")
             return []
 
         time_per_word = duration / len(words)
@@ -224,14 +225,15 @@ class VerticalVideoService:
             start_time = i * time_per_word
 
             try:
+                # Use Impact font (available on Windows) with fallback
                 txt_clip = (
                     TextClip(
                         word.upper(),
-                        fontsize=120,
+                        fontsize=100,
                         color="white",
-                        font="Arial-Bold",
+                        font="Impact",  # Windows-compatible font
                         stroke_color="black",
-                        stroke_width=4,
+                        stroke_width=5,
                         method="label",
                     )
                     .set_position("center")
@@ -241,7 +243,7 @@ class VerticalVideoService:
                 caption_clips.append(txt_clip)
 
             except Exception as e:
-                logger.warning(f"Failed to create caption for '{word}': {e}")
+                logger.error(f"Failed to create caption for '{word}': {e}")
 
         return caption_clips
 
