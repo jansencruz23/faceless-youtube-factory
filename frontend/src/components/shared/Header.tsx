@@ -28,27 +28,29 @@ export function Header() {
                     {/* Right Side */}
                     <div className="flex items-center gap-4">
                         {/* YouTube Status */}
-                            {ytConnection?.connected ? (
-                            <Badge variant="default" className="gap-1 bg-green-600">
-                                <Youtube className="h-3 w-3" />
-                                {ytConnection.channel_title}
-                            </Badge>
-                            ) : (
+                        {ytConnection?.connected ? (
                             <Link href="/youtube/connect">
-                                <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-secondary">
-                                <Youtube className="h-3 w-3" />
-                                Connect YouTube
+                                <Badge variant="default" className="gap-1 bg-green-600 cursor-pointer hover:bg-green-700">
+                                    <Youtube className="h-3 w-3" />
+                                    {ytConnection.channel_title}
                                 </Badge>
                             </Link>
-                            )}
-
-                            {/* New Project */}
-                            <Link href="/projects/new">
-                                <Button size="sm" className="gap-1">
-                                    <Plus className="h-4 w-4" />
-                                    New Project
-                                </Button>
+                        ) : (
+                            <Link href="/youtube/connect">
+                                <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-secondary">
+                                    <Youtube className="h-3 w-3" />
+                                    Connect YouTube
+                                </Badge>
                             </Link>
+                        )}
+
+                        {/* New Project */}
+                        <Link href="/projects/new">
+                            <Button size="sm" className="gap-1">
+                                <Plus className="h-4 w-4" />
+                                New Project
+                            </Button>
+                        </Link>
                     </div>
                 </div>
             </div>

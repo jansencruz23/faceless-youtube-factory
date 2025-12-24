@@ -65,13 +65,12 @@ async def youtube_callback(
         await youtube_crud.create_connection(
             session=session,
             user_id=DEFAULT_USER_ID,
+            channel_id=channel_info["channel_id"],
+            channel_title=channel_info["title"],
             access_token=token_data["token"],
             refresh_token=token_data["refresh_token"],
-            expires_at=datetime.now(timezone.utc)
+            expires_at=datetime.utcnow()
             + timedelta(seconds=settings.youtube_token_expires_in),
-            channel_id=channel_info["channel_id"],
-            channel_name=channel_info["title"],
-            channel_url=f"https://youtube.com/channel/{channel_info['channel_id']}",
         )
 
         logger.info(
