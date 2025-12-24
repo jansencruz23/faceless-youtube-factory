@@ -69,6 +69,7 @@ class Settings(BaseSettings):
     max_projects_per_hour: int = 10
     max_concurrent_video_jobs: int = 3
     youtube_daily_upload_limit: int = 15
+    youtube_token_expires_in: int = 3600  # 1 hour
 
     # Cleanup
     project_retention_days: int = 30
