@@ -1,6 +1,7 @@
 """
 YouTube API service for handling OAuth and uploads.
 """
+
 import google_auth_oauthlib
 from datetime import datetime, timedelta, timezone
 from typing import Dict, Any, Optional, Tuple
@@ -17,8 +18,8 @@ from app.services.encryption_service import encryption_service
 logger = get_logger(__name__)
 
 SCOPES = [
-    'https://www.googleapis.com/auth/youtube.upload',
-    'https://www.googleapis.com/auth/youtube.readonly'
+    "https://www.googleapis.com/auth/youtube.upload",
+    "https://www.googleapis.com/auth/youtube.readonly",
 ]
 
 
@@ -30,7 +31,7 @@ class YouTubeService:
         Generate OAuth authorization URL.
         Returns (authorization_url, state).
         """
-        # Create flow instance to manage the OAth 2.0 Authorization Grant Flow steps
+        # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = google_auth_oauthlib.flow.Flow.from_client_config(
             {
                 "web": {
@@ -40,18 +41,18 @@ class YouTubeService:
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
-            scopes=SCOPES
+            scopes=SCOPES,
         )
 
         flow.redirect_uri = settings.oauth_redirect_uri
 
         authorization_url, state = flow.authorization_url(
             # Enable offline access so that you can refresh an access token without
-            # re-prompting the user for permission. Recommended for moving to 
+            # re-prompting the user for permission. Recommended for moving to
             # server-side access.
             access_typ="offline",
             include_granted_scopes="true",
-            prompt="consent"
+            prompt="consent",
         )
 
         return authorization_url, state
@@ -69,7 +70,7 @@ class YouTubeService:
                     "token_uri": "https://oauth2.googleapis.com/token",
                 }
             },
-            scopes=SCOPES
+            scopes=SCOPES,
         )
         flow.redirect_uri = settings.oauth_redirect_uri
 
@@ -81,22 +82,18 @@ class YouTubeService:
             "token": credentials.token,
             "refresh_token": credentials.refresh_token,
             "expiry": credentials.expiry,
-            "scopes": credentials.scopes
+            "scopes": credentials.scopes,
         }
 
-    async def get_channel_info(
-        self,
-        access_token: str
-    ) -> Dict[str, str]:
+    async def get_channel_info(self, access_token: str) -> Dict[str, str]:
         """
         Fetch basic channel info using access token.
         """
-        credentials = google.oath2.credentials.Credentials(token=access_token)
+        credentials = google.oauth2.credentials.Credentials(token=access_token)
         youtube = build("youtube", "v3", credentials=credentials)
 
         request = youtube.channels().list(
-            part="snippet,contentDetails,statistics",
-            mine=True
+            part="snippet,contentDetails,statistics", mine=True
         )
         response = request.execute()
 
@@ -107,7 +104,7 @@ class YouTubeService:
         return {
             "channel_id": item["id"],
             "title": item["snippet"]["title"],
-            "thumbnail": item["snippet"]["thumbnails"]["default"]["url"]
+            "thumbnail": item["snippet"]["thumbnails"]["default"]["url"],
         }
 
     async def refresh_token(self, refresh_token: str) -> Dict[str, Any]:
@@ -125,23 +122,18 @@ class YouTubeService:
 
             # Refresh request
             import google.auth.transport.requests
+
             request = google.auth.transport.requests.Request()
             creds.refresh(request)
 
-            return {
-                "token": creds.token,
-                "expiry": creds.expiry
-            }
+            return {"token": creds.token, "expiry": creds.expiry}
 
         except Exception as e:
             logger.error("Token refresh failed", error=str(e))
             raise
 
     async def upload_video(
-        self,
-        access_token: str,
-        file_path: str,
-        metadata: Dict[str, Any]
+        self, access_token: str, file_path: str, metadata: Dict[str, Any]
     ) -> str:
         """
         Upload video to YouTube.
@@ -154,16 +146,10 @@ class YouTubeService:
 
         # Create media file object
         # chunksize defaults to 100MB, suitable for most needs
-        media = MediaFileUpload(
-            file_path, 
-            mimetype="video/mp4",
-            resumable=True
-        )
+        media = MediaFileUpload(file_path, mimetype="video/mp4", resumable=True)
 
         request = youtube.videos().insert(
-            part="snippet,status",
-            body=body,
-            media_body=media
+            part="snippet,status", body=body, media_body=media
         )
 
         logger.info("Starting YouTube upload", file=file_path)
@@ -178,6 +164,7 @@ class YouTubeService:
 
         logger.info("Upload complete", video_id=response.get("id"))
         return response.get("id")
+
 
 # Singleton instance
 youtube_service = YouTubeService()
