@@ -243,8 +243,35 @@ async def upload_to_youtube(
         session=session, project_id=project_id, status=ProjectStatus.UPLOADING_YOUTUBE
     )
 
-    # TODO: Add background task to actually upload
-    # For now, return success message
+    # Get video file path
+    video_path = video_asset.file_path
+
+    # Decrypt access token
+    from app.services.encryption_service import encryption_service
+
+    access_token = encryption_service.decrypt(connection.access_token)
+
+    # Prepare metadata for YouTube API
+    youtube_metadata = {
+        "snippet": {
+            "title": request.title,
+            "description": request.description,
+            "tags": request.tags,
+            "categoryId": request.category_id,
+        },
+        "status": {
+            "privacyStatus": request.privacy_status.value,
+        },
+    }
+
+    # Add background task to upload
+    background_tasks.add_task(
+        upload_video_background,
+        project_id=str(project_id),
+        video_path=f"static/{video_path}",
+        access_token=access_token,
+        metadata=youtube_metadata,
+    )
 
     logger.info("YouTube upload initiated", project_id=str(project_id))
 
@@ -253,3 +280,54 @@ async def upload_to_youtube(
         "message": "Upload started",
         "project_id": str(project_id),
     }
+
+
+async def upload_video_background(
+    project_id: str,
+    video_path: str,
+    access_token: str,
+    metadata: dict,
+):
+    """Background task to upload video to YouTube."""
+    from app.database import get_session_context
+    from app.models import Project
+    from uuid import UUID as UUIDType
+    from pathlib import Path
+
+    try:
+        logger.info(
+            "Starting YouTube upload", project_id=project_id, video_path=video_path
+        )
+
+        # Upload to YouTube
+        video_id = await youtube_service.upload_video(
+            access_token=access_token,
+            file_path=video_path,
+            metadata=metadata,
+        )
+
+        # Update project with YouTube info
+        async with get_session_context() as session:
+            project = await session.get(Project, UUIDType(project_id))
+            if project:
+                project.youtube_video_id = video_id
+                project.youtube_url = f"https://youtube.com/watch?v={video_id}"
+                project.status = ProjectStatus.PUBLISHED
+                session.add(project)
+                await session.commit()
+
+        logger.info(
+            "YouTube upload completed", project_id=project_id, video_id=video_id
+        )
+
+    except Exception as e:
+        logger.error("YouTube upload failed", project_id=project_id, error=str(e))
+
+        # Update project with error
+        async with get_session_context() as session:
+            project = await session.get(Project, UUIDType(project_id))
+            if project:
+                project.status = ProjectStatus.COMPLETED
+                project.error_message = f"YouTube upload failed: {str(e)}"
+                session.add(project)
+                await session.commit()
