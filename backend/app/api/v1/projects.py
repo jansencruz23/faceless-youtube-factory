@@ -33,12 +33,22 @@ from app.schemas.project import (
 from app.models import ProjectStatus
 from app.graph import run_pipeline
 from app.utils.logging import get_logger
+from app.auth import ClerkUser, get_current_user
 
 router = APIRouter()
 logger = get_logger(__name__)
 
-# Hardcoded user ID for now (would come from auth in production)
-DEFAULT_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+def get_user_uuid(clerk_user: ClerkUser) -> UUID:
+    """
+    Convert Clerk user ID to UUID for database operations.
+    Clerk IDs are strings like 'user_2abc123', we need to create a deterministic UUID.
+    """
+    import hashlib
+
+    # Create a deterministic UUID from the Clerk user ID
+    hash_bytes = hashlib.md5(clerk_user.user_id.encode()).digest()
+    return UUID(bytes=hash_bytes)
 
 
 async def run_pipeline_background(
@@ -83,11 +93,15 @@ async def create_project(
     request: ProjectCreateRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """Create a new project and start the generation pipeline."""
+    # Get user UUID from Clerk user
+    user_id = get_user_uuid(current_user)
+
     # Create project record
     project = await project_crud.create(
-        session=session, user_id=DEFAULT_USER_ID, title=request.title
+        session=session, user_id=user_id, title=request.title
     )
 
     # Update status to generating
@@ -99,7 +113,7 @@ async def create_project(
     background_tasks.add_task(
         run_pipeline_background,
         project_id=str(project.id),
-        user_id=str(DEFAULT_USER_ID),
+        user_id=str(user_id),
         script_prompt=request.script_prompt,
         auto_upload=request.auto_upload,
         image_mode=request.image_mode,
@@ -112,7 +126,7 @@ async def create_project(
         enable_captions=request.enable_captions,
     )
 
-    logger.info("Project created", project_id=str(project.id))
+    logger.info("Project created", project_id=str(project.id), user_id=str(user_id))
 
     return ProjectResponse(
         id=project.id,
@@ -171,10 +185,12 @@ async def list_projects(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """List all projects for the current user."""
+    user_id = get_user_uuid(current_user)
     items, total = await project_crud.list_by_user(
-        session=session, user_id=DEFAULT_USER_ID, page=page, page_size=page_size
+        session=session, user_id=user_id, page=page, page_size=page_size
     )
 
     return ProjectListResponse(
@@ -253,10 +269,15 @@ async def list_preset_music():
 
 
 @router.get("/{project_id}", response_model=ProjectDetailResponse)
-async def get_project(project_id: UUID, session: AsyncSession = Depends(get_session)):
+async def get_project(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
+):
     """Get project details with all related data."""
+    user_id = get_user_uuid(current_user)
     project = await project_crud.get_with_relations(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=user_id
     )
 
     if not project:
@@ -330,6 +351,7 @@ async def regenerate_audio(
     project_id: UUID,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """Regenerate audio with current cast settings."""
     import asyncio
@@ -338,8 +360,9 @@ async def regenerate_audio(
     from app.models import Asset, AssetType
     from sqlmodel import delete
 
+    user_id = get_user_uuid(current_user)
     project = await project_crud.get_with_relations(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=user_id
     )
 
     if not project:
@@ -403,7 +426,7 @@ async def regenerate_audio(
         try:
             state: GraphState = {
                 "project_id": project_id_str,
-                "user_id": str(DEFAULT_USER_ID),
+                "user_id": str(user_id),
                 "script_prompt": "",
                 "auto_upload": False,
                 "scenes_per_image": scenes_per_image,
@@ -476,14 +499,16 @@ async def regenerate_video(
     project_id: UUID,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """Regenerate video with existing audio."""
     from app.graph.nodes.video_composer import video_composer_node
     from app.models import Asset, AssetType
     from sqlmodel import select, delete
 
+    user_id = get_user_uuid(current_user)
     project = await project_crud.get_by_id(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=user_id
     )
 
     if not project:
@@ -522,7 +547,7 @@ async def regenerate_video(
 
         state: GraphState = {
             "project_id": str(project_id),
-            "user_id": str(DEFAULT_USER_ID),
+            "user_id": str(user_id),
             "script_prompt": "",
             "auto_upload": False,
             "script_json": latest_script.content,
@@ -552,7 +577,9 @@ async def regenerate_video(
 
 @router.post("/{project_id}/cancel")
 async def cancel_project(
-    project_id: UUID, session: AsyncSession = Depends(get_session)
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """
     Cancel an in-progress project.
@@ -561,8 +588,9 @@ async def cancel_project(
     Note: This doesn't stop a running background task immediately,
     but prevents further processing steps.
     """
+    user_id = get_user_uuid(current_user)
     project = await project_crud.get_by_id(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=user_id
     )
 
     if not project:
@@ -598,7 +626,9 @@ async def cancel_project(
 
 @router.delete("/{project_id}")
 async def delete_project(
-    project_id: UUID, session: AsyncSession = Depends(get_session)
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """
     Delete a project and all its related data.
@@ -614,8 +644,9 @@ async def delete_project(
     from pathlib import Path
     from app.config import settings
 
+    user_id = get_user_uuid(current_user)
     project = await project_crud.get_by_id(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=user_id
     )
 
     if not project:

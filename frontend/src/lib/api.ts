@@ -15,15 +15,22 @@ export function getStaticUrl(path: string): string {
 
 async function fetchAPI<T>(
     endpoint: string,
-    options?: RequestInit
+    options?: RequestInit & { token?: string | null }
 ): Promise<T> {
     const url = `${API_BASE}${endpoint}`;
 
+    const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...options?.headers as Record<string, string>,
+    };
+
+    // Add authorization header if token provided
+    if (options?.token) {
+        headers["Authorization"] = `Bearer ${options.token}`;
+    }
+
     const response = await fetch(url, {
-        headers: {
-            "Content-Type": "application/json",
-            ...options?.headers,
-        },
+        headers,
         ...options,
     });
 
