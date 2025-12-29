@@ -51,6 +51,33 @@ def get_user_uuid(clerk_user: ClerkUser) -> UUID:
     return UUID(bytes=hash_bytes)
 
 
+async def ensure_user_exists(session: AsyncSession, clerk_user: ClerkUser) -> UUID:
+    """
+    Ensure that a user exists in the database for the given Clerk user.
+    Creates the user if they don't exist.
+    Returns the user's UUID.
+    """
+    from app.models import User
+    from sqlmodel import select
+
+    user_id = get_user_uuid(clerk_user)
+
+    # Check if user exists
+    result = await session.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Create user with Clerk email or a generated one
+        email = clerk_user.email or f"{clerk_user.user_id}@clerk.user"
+        user = User(id=user_id, email=email)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        logger.info("Created new user from Clerk", user_id=str(user_id), email=email)
+
+    return user_id
+
+
 async def run_pipeline_background(
     project_id: str,
     user_id: str,
@@ -96,8 +123,8 @@ async def create_project(
     current_user: ClerkUser = Depends(get_current_user),
 ):
     """Create a new project and start the generation pipeline."""
-    # Get user UUID from Clerk user
-    user_id = get_user_uuid(current_user)
+    # Ensure user exists in database (creates if not)
+    user_id = await ensure_user_exists(session, current_user)
 
     # Create project record
     project = await project_crud.create(
