@@ -12,7 +12,7 @@ from pydantic import BaseModel
 
 from app.config import settings
 from app.database import get_session
-from app.crud import project as project_crud
+from app.crud import project_crud
 from app.models import ProjectStatus, User
 from app.api.v1.projects import run_pipeline_background
 from app.utils.logging import get_logger
@@ -66,9 +66,37 @@ class AutoGenerateRequest(BaseModel):
 
     topic: str
     title: str | None = None
-    video_format: str = "vertical"
-    auto_upload: bool = True
+
+    # Video format
+    video_format: str = "vertical"  # "vertical" or "horizontal"
+
+    # For vertical videos - background video options:
+    # - None = no background video
+    # - "preset:minecraft" = use preset video
+    # - "preset:subway" = use preset video
+    # - URL = uploaded video URL
+    background_video: str | None = None
+
+    # Background music options:
+    # - None = no music
+    # - "preset:lofi" = use preset music
+    # - "preset:energetic" = use preset music
+    # - URL = uploaded music URL
+    background_music: str | None = None
+    music_volume: float = 0.3  # 0.0 to 1.0
+
+    # Image mode (for horizontal videos mainly):
+    # - "per_scene" = generate image per scene
+    # - "shared" = one image for multiple scenes
+    # - "upload" = use uploaded background
+    # - "none" = no images (vertical with video background)
+    image_mode: str = "none"  # Default to none for vertical
+
+    # Captions
     enable_captions: bool = True
+
+    # Auto upload to YouTube
+    auto_upload: bool = True
 
 
 class AutoGenerateResponse(BaseModel):
@@ -107,6 +135,24 @@ async def auto_generate_video(
         session=session, project_id=project.id, status=ProjectStatus.GENERATING_SCRIPT
     )
 
+    # Process background video URL
+    background_video_url = None
+    if request.background_video:
+        if request.background_video.startswith("preset:"):
+            preset_name = request.background_video.replace("preset:", "")
+            background_video_url = f"/static/presets/videos/{preset_name}.mp4"
+        else:
+            background_video_url = request.background_video
+
+    # Process background music URL
+    background_music_url = None
+    if request.background_music:
+        if request.background_music.startswith("preset:"):
+            preset_name = request.background_music.replace("preset:", "")
+            background_music_url = f"/static/presets/music/{preset_name}.mp3"
+        else:
+            background_music_url = request.background_music
+
     # Start pipeline in background
     background_tasks.add_task(
         run_pipeline_background,
@@ -115,6 +161,10 @@ async def auto_generate_video(
         script_prompt=request.topic,
         auto_upload=request.auto_upload,
         video_format=request.video_format,
+        image_mode=request.image_mode,
+        background_video_url=background_video_url,
+        background_music_url=background_music_url,
+        music_volume=request.music_volume,
         enable_captions=request.enable_captions,
     )
 

@@ -33,6 +33,7 @@ services:
       - DEBUG=${DEBUG:-true}
       - HF_TOKEN=${HF_TOKEN}
       - HF_HOME=/root/.cache/huggingface
+      - AUTOMATION_API_KEY=${AUTOMATION_API_KEY}
     volumes:
       - ./backend:/app
       - ./backend/static:/app/static

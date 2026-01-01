@@ -57,17 +57,35 @@ You can use n8n's AI nodes or Groq directly to generate topics:
    - **Body (JSON)**:
    ```json
    {
-     "topic": "{{ $json.choices[0].message.content }}",
+     "topic": "{{ $('Generate Topic').item.json.choices[0].message.content.replace(/^\"|\"$/g, '') }}",
      "video_format": "vertical",
-     "auto_upload": true
+     "background_video": "preset:minecraft",
+     "background_music": "preset:lofi",
+     "music_volume": 0.3,
+     "image_mode": "none",
+     "enable_captions": true,
+     "auto_upload": false
    }
    ```
 
-### Step 4: Check Status (Optional - for polling)
+#### Available Options:
+
+| Field | Options | Description |
+|-------|---------|-------------|
+| `video_format` | `"vertical"`, `"horizontal"` | Video orientation |
+| `background_video` | `"preset:minecraft"`, `"preset:subway"`, `null`, URL | For vertical videos |
+| `background_music` | `"preset:lofi"`, `"preset:energetic"`, `null`, URL | Background music |
+| `music_volume` | `0.0` to `1.0` | Music volume level |
+| `image_mode` | `"none"`, `"per_scene"`, `"shared"` | Image generation mode |
+| `enable_captions` | `true`, `false` | Show captions |
+| `auto_upload` | `true`, `false` | Auto-upload to YouTube |
+
+### Step 4: Check Status (Optional)
 
 1. Add **Wait** node → 20 minutes
-2. Add **HTTP Request** to check status:
-   - **URL**: `http://backend:8000/api/v1/projects/{{ $json.id }}`
+2. Add **HTTP Request**:
+   - **URL**: `http://backend:8000/api/v1/automation/status/{{ $json.project_id }}`
+   - **Headers**: `X-API-Key`: `YOUR_AUTOMATION_API_KEY`
 
 ---
 
