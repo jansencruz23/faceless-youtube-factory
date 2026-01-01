@@ -59,9 +59,9 @@ You can use n8n's AI nodes or Groq directly to generate topics:
    {
      "topic": "{{ $('Generate Topic').item.json.choices[0].message.content.replace(/^\"|\"$/g, '') }}",
      "video_format": "vertical",
-     "background_video": "preset:minecraft",
-     "background_music": "preset:lofi",
-     "music_volume": 0.3,
+     "background_video": "preset:minecraft_parkour",
+     "background_music": "preset:dreamland",
+     "music_volume": 0.1,
      "image_mode": "none",
      "enable_captions": true,
      "auto_upload": false

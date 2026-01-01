@@ -140,7 +140,8 @@ async def auto_generate_video(
     if request.background_video:
         if request.background_video.startswith("preset:"):
             preset_name = request.background_video.replace("preset:", "")
-            background_video_url = f"/static/presets/videos/{preset_name}.mp4"
+            # Path relative to static_base (static/), not starting with /static
+            background_video_url = f"presets/videos/{preset_name}.mp4"
         else:
             background_video_url = request.background_video
 
@@ -149,7 +150,8 @@ async def auto_generate_video(
     if request.background_music:
         if request.background_music.startswith("preset:"):
             preset_name = request.background_music.replace("preset:", "")
-            background_music_url = f"/static/presets/music/{preset_name}.mp3"
+            # Path relative to static_base (static/), not starting with /static
+            background_music_url = f"presets/music/{preset_name}.mp3"
         else:
             background_music_url = request.background_music
 
