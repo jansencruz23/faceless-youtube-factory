@@ -25,49 +25,45 @@ docker-compose up -d
    - **Trigger Interval**: Custom (Cron)
    - **Cron Expression**: `0 */5 * * *` (every 5 hours)
 
-### Step 2: Generate Topic (AI)
+### Step 2: Generate Topic (Optional - AI)
 
-1. Click **+** → Search "OpenAI" or "HTTP Request"
-2. For **HTTP Request** to Groq:
+You can use n8n's AI nodes or Groq directly to generate topics:
+
+1. Click **+** → Search "HTTP Request"
+2. Configure for Groq API:
    - **Method**: POST
    - **URL**: `https://api.groq.com/openai/v1/chat/completions`
    - **Headers**: 
      - `Authorization`: `Bearer YOUR_GROQ_API_KEY`
      - `Content-Type`: `application/json`
-   - **Body**:
+   - **Body (JSON)**:
    ```json
    {
      "model": "llama-3.3-70b-versatile",
-     "messages": [
-       {
-         "role": "user", 
-         "content": "Generate a unique topic for a 60-second video about surprising science facts. Return only the topic, one line."
-       }
-     ],
+     "messages": [{"role": "user", "content": "Generate a unique topic for a 60-second video about surprising science facts. Return only the topic."}],
      "temperature": 0.9
    }
    ```
 
-### Step 3: Create Project
+### Step 3: Create Project (Use Automation API)
 
 1. Click **+** → Search "HTTP Request"
 2. Configure:
    - **Method**: POST
-   - **URL**: `http://backend:8000/api/v1/projects`
+   - **URL**: `http://backend:8000/api/v1/automation/generate`
    - **Headers**:
+     - `X-API-Key`: `YOUR_AUTOMATION_API_KEY` (from .env)
      - `Content-Type`: `application/json`
-     - `Authorization`: `Bearer YOUR_CLERK_TOKEN`
-   - **Body**:
+   - **Body (JSON)**:
    ```json
    {
-     "title": "{{ $json.choices[0].message.content }}",
-     "script_prompt": "{{ $json.choices[0].message.content }}",
-     "auto_upload": true,
-     "video_format": "vertical"
+     "topic": "{{ $json.choices[0].message.content }}",
+     "video_format": "vertical",
+     "auto_upload": true
    }
    ```
 
-### Step 4: Wait for Completion (Optional)
+### Step 4: Check Status (Optional - for polling)
 
 1. Add **Wait** node → 20 minutes
 2. Add **HTTP Request** to check status:

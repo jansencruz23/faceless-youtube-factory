@@ -71,6 +71,9 @@ class Settings(BaseSettings):
     youtube_daily_upload_limit: int = 15
     youtube_token_expires_in: int = 3600  # 1 hour
 
+    # Automation API Key (for n8n and other automation tools)
+    automation_api_key: str = ""  # Set in .env
+
     # Cleanup
     project_retention_days: int = 30
 

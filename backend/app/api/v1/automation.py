@@ -1,0 +1,167 @@
+"""
+Automation API endpoints for n8n and other automation tools.
+Uses API key authentication instead of Clerk.
+"""
+
+from uuid import UUID
+import secrets
+
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
+from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
+
+from app.config import settings
+from app.database import get_session
+from app.crud import project as project_crud
+from app.models import ProjectStatus, User
+from app.api.v1.projects import run_pipeline_background
+from app.utils.logging import get_logger
+from sqlmodel import select
+import hashlib
+
+router = APIRouter()
+logger = get_logger(__name__)
+
+# Default automation user ID (created on first use)
+AUTOMATION_USER_EMAIL = "automation@system.internal"
+
+
+def verify_api_key(x_api_key: str = Header(..., alias="X-API-Key")) -> str:
+    """Verify the automation API key."""
+    if not settings.automation_api_key:
+        raise HTTPException(
+            status_code=503,
+            detail="Automation API key not configured. Set AUTOMATION_API_KEY in .env",
+        )
+
+    if not secrets.compare_digest(x_api_key, settings.automation_api_key):
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    return x_api_key
+
+
+async def get_or_create_automation_user(session: AsyncSession) -> UUID:
+    """Get or create the automation system user."""
+    result = await session.execute(
+        select(User).where(User.email == AUTOMATION_USER_EMAIL)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Create deterministic UUID from email
+        hash_bytes = hashlib.md5(AUTOMATION_USER_EMAIL.encode()).digest()
+        user_id = UUID(bytes=hash_bytes)
+
+        user = User(id=user_id, email=AUTOMATION_USER_EMAIL)
+        session.add(user)
+        await session.commit()
+        await session.refresh(user)
+        logger.info("Created automation user", user_id=str(user.id))
+
+    return user.id
+
+
+class AutoGenerateRequest(BaseModel):
+    """Request body for auto-generate endpoint."""
+
+    topic: str
+    title: str | None = None
+    video_format: str = "vertical"
+    auto_upload: bool = True
+    enable_captions: bool = True
+
+
+class AutoGenerateResponse(BaseModel):
+    """Response from auto-generate endpoint."""
+
+    project_id: str
+    title: str
+    status: str
+    message: str
+
+
+@router.post("/generate", response_model=AutoGenerateResponse)
+async def auto_generate_video(
+    request: AutoGenerateRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_session),
+    _api_key: str = Depends(verify_api_key),
+):
+    """
+    Create a new project and start video generation.
+
+    This endpoint is for automation tools like n8n.
+    Requires X-API-Key header with valid AUTOMATION_API_KEY.
+    """
+    # Get automation user
+    user_id = await get_or_create_automation_user(session)
+
+    # Create title from topic if not provided
+    title = request.title or f"Auto: {request.topic[:50]}"
+
+    # Create project
+    project = await project_crud.create(session=session, user_id=user_id, title=title)
+
+    # Update status
+    await project_crud.update_status(
+        session=session, project_id=project.id, status=ProjectStatus.GENERATING_SCRIPT
+    )
+
+    # Start pipeline in background
+    background_tasks.add_task(
+        run_pipeline_background,
+        project_id=str(project.id),
+        user_id=str(user_id),
+        script_prompt=request.topic,
+        auto_upload=request.auto_upload,
+        video_format=request.video_format,
+        enable_captions=request.enable_captions,
+    )
+
+    logger.info(
+        "Auto-generated project created",
+        project_id=str(project.id),
+        topic=request.topic,
+    )
+
+    return AutoGenerateResponse(
+        project_id=str(project.id),
+        title=title,
+        status="generating_script",
+        message="Video generation started. Use GET /api/v1/projects/{id} to check status.",
+    )
+
+
+@router.get("/status/{project_id}")
+async def get_project_status(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _api_key: str = Depends(verify_api_key),
+):
+    """
+    Get project status for automation polling.
+
+    Returns simplified status for n8n workflow decisions.
+    """
+    project = await project_crud.get(session=session, project_id=project_id)
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Determine if complete
+    is_complete = project.status in [
+        ProjectStatus.COMPLETED,
+        ProjectStatus.PUBLISHED,
+        ProjectStatus.FAILED,
+    ]
+
+    return {
+        "project_id": str(project.id),
+        "title": project.title,
+        "status": project.status.value,
+        "is_complete": is_complete,
+        "is_success": project.status
+        in [ProjectStatus.COMPLETED, ProjectStatus.PUBLISHED],
+        "youtube_url": project.youtube_url,
+        "error_message": project.error_message,
+    }
