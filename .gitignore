@@ -12,7 +12,7 @@ backend/static/
 **/static/audio/
 **/static/video/
 **/static/images/
-**/static/uploads/
+**/static/uploads/ 
 **/static/shorts/
 
 # Editor/IDE specific files
