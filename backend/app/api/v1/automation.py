@@ -195,7 +195,7 @@ async def get_project_status(
 
     Returns simplified status for n8n workflow decisions.
     """
-    project = await project_crud.get(session=session, project_id=project_id)
+    project = await project_crud.get_by_id(session=session, project_id=project_id)
 
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
