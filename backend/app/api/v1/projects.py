@@ -5,8 +5,6 @@ from uuid import UUID
 from pathlib import Path
 import shutil
 
-from pydantic import BaseModel, Field
-
 from fastapi import (
     APIRouter,
     Depends,
@@ -156,107 +154,6 @@ async def create_project(
     )
 
     logger.info("Project created", project_id=str(project.id), user_id=str(user_id))
-
-    return ProjectResponse(
-        id=project.id,
-        title=project.title,
-        status=project.status.value,
-        youtube_video_id=project.youtube_video_id,
-        youtube_url=project.youtube_url,
-        error_message=project.error_message,
-        created_at=project.created_at,
-        updated_at=project.updated_at,
-    )
-
-
-class AutoGenerateRequest(BaseModel):
-    """Request for automated video generation (used by n8n)."""
-
-    topic_category: str = Field(
-        ...,
-        description="Category for topic generation (e.g., 'surprising science facts')",
-    )
-    video_format: str = Field(
-        default="vertical", description="'horizontal' or 'vertical'"
-    )
-    auto_upload: bool = Field(
-        default=True, description="Auto-upload to YouTube when complete"
-    )
-
-
-@router.post("/auto-generate", response_model=ProjectResponse)
-async def auto_generate_project(
-    request: AutoGenerateRequest,
-    background_tasks: BackgroundTasks,
-    session: AsyncSession = Depends(get_session),
-    current_user: ClerkUser = Depends(get_current_user),
-):
-    """
-    Auto-generate a video from a topic category.
-
-    This endpoint is designed for automation tools like n8n:
-    1. Generates a unique topic using Groq LLM
-    2. Creates a project with that topic
-    3. Starts the video generation pipeline
-
-    Perfect for scheduled workflows.
-    """
-    from langchain_groq import ChatGroq
-    from app.config import settings
-
-    # Generate topic from category using Groq
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.9,
-        api_key=settings.groq_api_key,
-    )
-
-    prompt = f"""Generate a unique, engaging video topic for a short-form video.
-
-Category: {request.topic_category}
-
-Requirements:
-- Be specific and interesting
-- Should work as a 30-90 second video
-- Should hook viewers in the first few seconds
-
-Return ONLY the topic, nothing else."""
-
-    response = await llm.ainvoke(prompt)
-    topic = response.content.strip().strip('"').strip("'")
-
-    logger.info(
-        "Generated topic for auto-generate",
-        category=request.topic_category,
-        topic=topic,
-    )
-
-    # Ensure user exists
-    user_id = await ensure_user_exists(session, current_user)
-
-    # Create project
-    title = f"Auto: {topic[:50]}" if len(topic) > 50 else f"Auto: {topic}"
-    project = await project_crud.create(session=session, user_id=user_id, title=title)
-
-    # Update status
-    await project_crud.update_status(
-        session=session, project_id=project.id, status=ProjectStatus.GENERATING_SCRIPT
-    )
-
-    # Start pipeline
-    background_tasks.add_task(
-        run_pipeline_background,
-        project_id=str(project.id),
-        user_id=str(user_id),
-        script_prompt=topic,
-        auto_upload=request.auto_upload,
-        video_format=request.video_format,
-        enable_captions=True,
-    )
-
-    logger.info(
-        "Auto-generated project created", project_id=str(project.id), topic=topic
-    )
 
     return ProjectResponse(
         id=project.id,
