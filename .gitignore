@@ -14,7 +14,6 @@ backend/static/
 **/static/images/
 **/static/uploads/
 **/static/shorts/
-**/static/presets/
 
 # Editor/IDE specific files
 .idea/
