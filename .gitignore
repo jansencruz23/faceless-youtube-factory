@@ -14,10 +14,9 @@ venv/
 **/static/uploads/
 **/static/shorts/
 
-# Keep presets folder tracked (except large videos)
+# Keep presets folder tracked
 !**/static/presets/
 !**/static/presets/**
-**/static/presets/videos/
 
 # Editor/IDE specific files
 .idea/
