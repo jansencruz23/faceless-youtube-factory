@@ -112,16 +112,50 @@ n8n starts automatically with Docker Compose. When your PC boots:
 
 ## Multi-Platform Upload
 
-n8n has built-in nodes for:
+After your video is complete, add upload nodes to post to social media:
 
-| Platform | Node Name | Notes |
-|----------|-----------|-------|
-| TikTok | TikTok | Upload videos directly |
-| Instagram | Facebook Graph API | Via connected Facebook page |
-| Facebook | Facebook Graph API | Page posts |
-| Twitter/X | Twitter | Direct posting |
+### YouTube (via your app)
 
-After video is complete, add these nodes to upload to multiple platforms!
+Already handled by `auto_upload: true` in your request!
+
+### TikTok
+
+1. Click **+** → Search **"TikTok"**
+2. **Auth**: Connect your TikTok Creator account
+3. **Operation**: Upload Video
+4. **Video**: Use the video file from your project (download first)
+
+> ⚠️ TikTok API requires Creator account approval
+
+### Facebook & Instagram
+
+1. Click **+** → Search **"Facebook Graph API"**
+2. **Auth**: Connect Facebook Business account with Instagram linked
+3. For **Instagram Reels**:
+   - Container: Create → Reel
+   - Publish: Container ID
+
+> ⚠️ Requires Meta Business verification
+
+### Twitter/X
+
+1. Click **+** → Search **"Twitter"**
+2. **Auth**: Connect Twitter Developer account
+3. **Operation**: Create Tweet with Media
+
+### Alternative: Manual Upload via Folder
+
+The easiest approach - save videos to a synced folder:
+
+1. After video completes, download to local folder
+2. Use Google Drive / Dropbox to sync
+3. Manually upload from phone (or use scheduling apps like Later, Buffer)
+
+### Finding Your Generated Video
+
+After status shows `completed` or `published`:
+- Video path: `http://localhost:8000/static/shorts/{project_id}.mp4`
+- Or check your dashboard: http://localhost:3000
 
 ---
 

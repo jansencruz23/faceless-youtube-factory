@@ -3,6 +3,7 @@ services:
   db:
     image: postgres:15-alpine
     container_name: youtube_factory_db
+    restart: unless-stopped
     environment:
       POSTGRES_USER: ${DB_USER:-youtube_factory}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-devpassword123}
@@ -22,6 +23,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: youtube_factory_api
+    restart: unless-stopped
     environment:
       - DATABASE_URL=postgresql+asyncpg://${DB_USER:-youtube_factory}:${DB_PASSWORD:-devpassword123}@db:5432/${DB_NAME:-youtube_factory}
       - GROQ_API_KEY=${GROQ_API_KEY}
@@ -64,6 +66,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: youtube_factory_web
+    restart: unless-stopped
     environment:
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
       - NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL:-ws://localhost:8000}
