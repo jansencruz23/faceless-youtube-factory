@@ -3,11 +3,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { ProjectDetail } from "@/types";
-import {
-    getYouTubeConnection,
-    generateYouTubeMetadata,
-    uploadToYouTube,
-} from "@/lib/api";
+import { useApi } from "@/lib/useApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -37,6 +33,7 @@ const CATEGORIES = [
 ];
 
 export function YouTubeSettingsTab({ project }: YouTubeSettingsTabProps) {
+    const api = useApi();
     const queryClient = useQueryClient();
     const [title, setTitle] = useState(project.youtube_metadata?.title || project.title);
     const [description, setDescription] = useState("");
@@ -46,11 +43,11 @@ export function YouTubeSettingsTab({ project }: YouTubeSettingsTabProps) {
     const [privacyStatus, setPrivacyStatus] = useState<"public" | "private" | "unlisted">("private");
     const { data: ytConnection, isLoading: connectionLoading } = useQuery({
         queryKey: ["youtube-connection"],
-        queryFn: getYouTubeConnection,
+        queryFn: () => api.getYouTubeConnection(),
     });
 
     const generateMutation = useMutation({
-        mutationFn: () => generateYouTubeMetadata(project.id),
+        mutationFn: () => api.generateYouTubeMetadata(project.id),
         onSuccess: (data) => {
             setTitle(data.title);
             setDescription(data.description);
@@ -60,7 +57,7 @@ export function YouTubeSettingsTab({ project }: YouTubeSettingsTabProps) {
     });
     const uploadMutation = useMutation({
         mutationFn: () =>
-            uploadToYouTube(project.id, {
+            api.uploadToYouTube(project.id, {
                 title,
                 description,
                 tags,
