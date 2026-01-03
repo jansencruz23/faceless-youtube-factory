@@ -4,7 +4,9 @@ import { ProjectDetail } from "@/types";
 import { getStaticUrl } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Play, Film, Volume2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Play, Film, Volume2, Download, Copy, Check } from "lucide-react";
+import { useState } from "react";
 
 interface PreviewTabProps {
     project: ProjectDetail;
@@ -13,6 +15,29 @@ interface PreviewTabProps {
 export function PreviewTab({ project }: PreviewTabProps) {
     const videoAsset = project.assets.find((a) => a.asset_type === "video");
     const audioAssets = project.assets.filter((a) => a.asset_type === "audio");
+    const [copied, setCopied] = useState(false);
+
+    const handleDownload = () => {
+        if (videoAsset) {
+            const url = getStaticUrl(videoAsset.url);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `${project.title.replace(/[^a-zA-Z0-9]/g, "_")}.mp4`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    };
+
+    const handleCopyPath = () => {
+        if (videoAsset) {
+            // Copy the full URL to clipboard
+            const url = getStaticUrl(videoAsset.url);
+            navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        }
+    };
 
     if (!videoAsset && audioAssets.length === 0) {
         return (
@@ -49,18 +74,47 @@ export function PreviewTab({ project }: PreviewTabProps) {
                         </div>
                     )}
                     <CardContent className="py-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-center justify-between flex-wrap gap-3">
                             <div className="flex items-center gap-2">
                                 <Play className="h-4 w-4 text-primary" />
                                 <span className="font-medium">
                                     {videoAsset.url.includes("shorts/") ? "Short Video" : "Final Video"}
                                 </span>
+                                {videoAsset.file_size_bytes && (
+                                    <Badge variant="secondary">
+                                        {(videoAsset.file_size_bytes / (1024 * 1024)).toFixed(1)} MB
+                                    </Badge>
+                                )}
                             </div>
-                            {videoAsset.file_size_bytes && (
-                                <Badge variant="secondary">
-                                    {(videoAsset.file_size_bytes / (1024 * 1024)).toFixed(1)} MB
-                                </Badge>
-                            )}
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={handleCopyPath}
+                                    className="gap-1"
+                                >
+                                    {copied ? (
+                                        <>
+                                            <Check className="h-4 w-4 text-green-500" />
+                                            Copied!
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Copy className="h-4 w-4" />
+                                            Copy URL
+                                        </>
+                                    )}
+                                </Button>
+                                <Button
+                                    variant="default"
+                                    size="sm"
+                                    onClick={handleDownload}
+                                    className="gap-1"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Download
+                                </Button>
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
