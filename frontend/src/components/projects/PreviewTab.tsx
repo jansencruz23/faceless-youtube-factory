@@ -5,7 +5,7 @@ import { getStaticUrl } from "@/lib/api";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Play, Film, Volume2, Download, Copy, Check } from "lucide-react";
+import { Play, Film, Volume2, Download, Copy, Check, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 interface PreviewTabProps {
@@ -113,6 +113,15 @@ export function PreviewTab({ project }: PreviewTabProps) {
                                 >
                                     <Download className="h-4 w-4" />
                                     Download
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(getStaticUrl(videoAsset.url), '_blank')}
+                                    className="gap-1"
+                                >
+                                    <ExternalLink className="h-4 w-4" />
+                                    Open
                                 </Button>
                             </div>
                         </div>
