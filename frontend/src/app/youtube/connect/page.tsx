@@ -2,30 +2,28 @@
 
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useRouter } from "next/navigation";
-import {
-    getYouTubeConnection,
-    getYouTubeAuthUrl,
-    disconnectYouTube,
-} from "@/lib/api";
+import { useApi } from "@/lib/useApi";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Youtube, CheckCircle2, Loader2, LogOut } from "lucide-react";
 
 export default function YouTubeConnectPage() {
     const router = useRouter();
+    const api = useApi();
+
     const { data: connection, isLoading, refetch } = useQuery({
         queryKey: ["youtube-connection"],
-        queryFn: getYouTubeConnection,
+        queryFn: () => api.getYouTubeConnection(),
     });
     const connectMutation = useMutation({
-        mutationFn: getYouTubeAuthUrl,
+        mutationFn: () => api.getYouTubeAuthUrl(),
         onSuccess: (data) => {
             // Redirect to Google OAuth
             window.location.href = data.auth_url;
         },
     });
     const disconnectMutation = useMutation({
-        mutationFn: disconnectYouTube,
+        mutationFn: () => api.disconnectYouTube(),
         onSuccess: () => {
             refetch();
         },
