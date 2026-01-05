@@ -1,19 +1,29 @@
 # Faceless YouTube Factory
 
-AI-powered video generation and YouTube upload automation. Create engaging videos from text prompts with AI-generated scripts, text-to-speech voices, and automated publishing.
+AI-powered video generation and multi-platform upload automation. Create engaging short-form videos from text prompts with AI-generated scripts, text-to-speech voices, background music, and automated publishing.
 
-## Features
+## ✨ Features
 
-- **AI Script Generation** - Groq's LLama 3.3 generates multi-speaker video scripts
-- **Intelligent Voice Casting** - AI selects from 100+ Microsoft Edge TTS voices
+### Video Generation
+- **AI Script Generation** - Groq's LLama 3.3 generates engaging multi-speaker video scripts
+- **Intelligent Voice Casting** - AI selects from 100+ Microsoft Edge TTS voices based on character
 - **Voice Customization** - Adjust pitch and speed per character
-- **Video Composition** - Auto-generated videos with subtitles
-- **YouTube Integration** - One-click upload with AI-generated metadata
+- **Vertical Video (Shorts/Reels)** - 9:16 format with background video, music, and animated captions
+- **Horizontal Video** - 16:9 format with per-scene AI images
+- **Whisper-powered Captions** - Word-level accurate subtitles with pop-in animation
+
+### Automation
+- **n8n Workflow Integration** - Schedule automatic video generation every X hours
+- **Automation API** - API key-authenticated endpoints for server-to-server automation
+- **YouTube Auto-Upload** - One-click upload with AI-generated metadata
 - **Real-time Updates** - WebSocket notifications for generation progress
 
-## Architecture
+### UI/UX
+- **Modern Dark UI** - Glassmorphism design with Clerk authentication
+- **Video Preview** - Download, copy URL, or open videos directly
+- **Voice Casting Studio** - Visual voice assignment with audio preview
 
-This project uses a **containerized client-server architecture** with three tiers:
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -21,27 +31,34 @@ This project uses a **containerized client-server architecture** with three tier
 │   (Next.js)     │◀────│   (FastAPI)     │◀────│    Database     │
 │   Port 3000     │ WS  │   Port 8000     │     │   Port 5432     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
+         │                      │
+         │              ┌───────▼───────┐
+         │              │     n8n       │
+         └─────────────▶│  Automation   │
+                        │   Port 5678   │
+                        └───────────────┘
 ```
 
-The backend uses **LangGraph** to orchestrate an event-driven video generation pipeline:
+**Pipeline:** Script Writer → Casting Director → Audio Generator → Video Composer → YouTube Uploader
 
-```
-Script Writer → Casting Director → Audio Generator → Video Composer → YouTube Uploader
-```
+## 🛠️ Tech Stack
 
-## Tech Stack
+| Layer | Technologies |
+|-------|-------------|
+| **Backend** | FastAPI, LangGraph, Groq LLM, Edge-TTS, MoviePy, FFmpeg, Whisper |
+| **Frontend** | Next.js 15, TypeScript, shadcn/ui, TanStack Query, Tailwind CSS, Clerk |
+| **Database** | PostgreSQL, SQLAlchemy, asyncpg |
+| **Automation** | n8n, Docker |
 
-**Backend:** FastAPI, LangGraph, Groq LLM, Edge-TTS, MoviePy, PostgreSQL, SQLAlchemy
-
-**Frontend:** Next.js 15, TypeScript, shadcn/ui, TanStack Query, Tailwind CSS
-
-## Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 
 - Docker & Docker Compose
+- NVIDIA GPU (optional, for faster Whisper)
 - Groq API key ([console.groq.com](https://console.groq.com/keys))
-- Google Cloud project with YouTube Data API v3 enabled
+- Clerk account ([clerk.com](https://clerk.com))
+- Google Cloud project with YouTube Data API v3 (for YouTube upload)
 
 ### Setup
 
@@ -56,43 +73,55 @@ cp .env.example .env
 docker-compose up --build
 ```
 
-Access the app at http://localhost:3000
+Access:
+- **App**: http://localhost:3000
+- **API Docs**: http://localhost:8000/docs
+- **n8n Automation**: http://localhost:5678
 
-### Development
-
-For hot-reloading:
-
-```bash
-docker-compose watch
-```
-
-Or run services separately:
-
-```bash
-# Backend
-cd backend && pip install -r requirements.txt
-uvicorn app.main:app --reload
-
-# Frontend  
-cd frontend && npm install && npm run dev
-```
-
-## Configuration
+### Environment Variables
 
 | Variable | Description |
 |----------|-------------|
 | `GROQ_API_KEY` | Groq API key for LLM |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
+| `CLERK_SECRET_KEY` | Clerk secret key |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for OAuth tokens |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `AUTOMATION_API_KEY` | Secret key for n8n automation |
 
-Generate encryption key:
+## 🤖 n8n Automation
+
+Automate video generation on a schedule or on-demand.
+
+### Automation API
+
 ```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+# Create project and generate video
+POST /api/v1/automation/generate
+Header: X-API-Key: your-automation-key
+
+{
+  "topic": "5 mind-blowing psychology facts",
+  "video_format": "vertical",
+  "background_video": "preset:minecraft_parkour",
+  "background_music": "preset:dreamland",
+  "music_volume": 0.1,
+  "enable_captions": true,
+  "auto_upload": false
+}
 ```
 
-## API Reference
+### Available Presets
+
+| Type | Options |
+|------|---------|
+| **Background Video** | `preset:minecraft_parkour`, `preset:subway_surfers_neo` |
+| **Background Music** | `preset:dreamland` |
+
+See [N8N_AUTOMATION.md](docs/N8N_AUTOMATION.md) for full workflow setup.
+
+## 📖 API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -101,10 +130,30 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 | GET | `/api/v1/projects/{id}` | Get project details |
 | PUT | `/api/v1/projects/{id}/cast` | Update voice assignments |
 | GET | `/api/v1/voices` | List available voices |
-| POST | `/api/v1/youtube/projects/{id}/upload-to-youtube` | Upload to YouTube |
+| POST | `/api/v1/automation/generate` | Create + auto-generate video |
+| GET | `/api/v1/automation/status/{id}` | Get project status (for polling) |
+| POST | `/api/v1/youtube/upload` | Upload to YouTube |
 
-Full API docs available at http://localhost:8000/docs
+## 📁 Project Structure
 
-## License
+```
+├── backend/
+│   ├── app/
+│   │   ├── api/v1/          # API routes
+│   │   ├── graph/           # LangGraph pipeline
+│   │   │   └── nodes/       # Pipeline stages
+│   │   ├── services/        # Video/audio generation
+│   │   └── models/          # Database models
+│   └── static/
+│       └── presets/         # Background videos & music
+├── frontend/
+│   └── src/
+│       ├── app/             # Next.js pages
+│       └── components/      # React components
+├── docs/                    # Documentation
+└── docker-compose.yml
+```
+
+## 📄 License
 
 MIT
