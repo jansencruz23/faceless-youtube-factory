@@ -159,62 +159,171 @@ After status shows `completed` or `published`:
 
 ---
 
-## Avoiding Duplicate Topics (Google Sheets)
+## Avoiding Duplicate Topics (AI Semantic Check)
 
-Use Google Sheets to track used topics and prevent duplicates.
+Simple string matching can't detect that "Why you forget names" and "The science of forgetting" are the same topic. Use AI to detect semantic duplicates.
 
-### Setup
+### Prerequisites
 
 1. Create a Google Sheet with columns:
    - **A**: Date
-   - **B**: Topic
+   - **B**: Topic  
    - **C**: Project ID
    - **D**: Status
 
-### Workflow: Check Before Creating
+2. In n8n, connect your Google account:
+   - Go to **Credentials** → **Add Credential** → **Google Sheets OAuth2**
+   - Follow the OAuth flow
 
-1. **Generate Topic** (Groq HTTP Request as above)
+### Complete Workflow (7 nodes)
 
-2. **Read Google Sheet** (Check for duplicates)
-   - Add **Google Sheets** node
-   - **Operation**: Get Many
-   - **Sheet**: Your topic tracker
-   - **Range**: `B:B` (topic column)
-
-3. **IF Node** (Check if topic exists)
-   - Add **IF** node
-   - **Condition**: 
-     ```
-     {{ $json.values.flat().some(t => t.toLowerCase().includes($('Generate Topic').item.json.choices[0].message.content.toLowerCase().substring(0, 20))) }}
-     ```
-   - **True branch**: Loop back to Generate Topic
-   - **False branch**: Continue to Create Project
-
-4. **Create Project** (HTTP Request to automation API)
-
-5. **Append to Google Sheet** (Log the topic)
-   - Add **Google Sheets** node
-   - **Operation**: Append
-   - **Values**:
-     - Date: `{{ $now.format('YYYY-MM-DD') }}`
-     - Topic: `{{ $('Generate Topic').item.json.choices[0].message.content }}`
-     - Project ID: `{{ $json.project_id }}`
-     - Status: `pending`
-
-### Simpler Alternative: Use Groq to Check
-
-Include used topics in the prompt:
-
-```json
-{
-  "model": "llama-3.3-70b-versatile",
-  "messages": [{
-    "role": "user", 
-    "content": "Generate a unique topic for a 60-second video about psychology facts. Do NOT repeat these used topics: [topic1, topic2, topic3]. Return only the new topic."
-  }],
-  "temperature": 0.9
-}
 ```
+Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate (AI) → IF duplicate?
+                                                                                    ├─ YES → back to Generate
+                                                                                    └─ NO → Create Project → Log to Sheet
+```
+
+### Step-by-Step Instructions
+
+#### Node 1: Schedule Trigger
+
+1. Click **Add first step** → Search "Schedule"
+2. Configure:
+   - **Trigger Interval**: Hours
+   - **Hours Between Triggers**: 5
+
+#### Node 2: Get Existing Topics (Google Sheets)
+
+1. Click **+** → Search "Google Sheets"
+2. Configure:
+   - **Credential**: Select your Google Sheets credential
+   - **Operation**: Read Rows
+   - **Document**: Select your topic tracker spreadsheet
+   - **Sheet**: Sheet1 (or your sheet name)
+   - **Options** → **Data Location**: First row is header
+3. This outputs all your existing topics
+
+#### Node 3: Generate New Topic (Groq)
+
+1. Click **+** → Search "HTTP Request"
+2. Configure:
+   - **Method**: POST
+   - **URL**: `https://api.groq.com/openai/v1/chat/completions`
+   - **Authentication**: Header Auth
+     - Name: `Authorization`
+     - Value: `Bearer YOUR_GROQ_API_KEY`
+   - **Headers**: Add `Content-Type`: `application/json`
+   - **Body Content Type**: JSON
+   - **Body**:
+   ```json
+   {
+     "model": "llama-3.3-70b-versatile",
+     "messages": [{
+       "role": "user",
+       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts. The topic should be specific and interesting. Return ONLY the topic text, nothing else."
+     }],
+     "temperature": 0.9
+   }
+   ```
+
+#### Node 4: Check for Semantic Duplicates (Groq AI)
+
+1. Click **+** → Search "HTTP Request" 
+2. Rename to "Check Duplicate"
+3. Configure:
+   - **Method**: POST
+   - **URL**: `https://api.groq.com/openai/v1/chat/completions`
+   - **Authentication**: Same as above
+   - **Body**:
+   ```json
+   {
+     "model": "llama-3.3-70b-versatile",
+     "messages": [{
+       "role": "user",
+       "content": "I have these existing video topics:\n{{ $('Get Existing Topics').all().map(item => '- ' + item.json.Topic).join('\\n') }}\n\nNew proposed topic: \"{{ $('Generate New Topic').item.json.choices[0].message.content }}\"\n\nIs the new topic semantically too similar to ANY existing topic? Topics about the same concept but with different wording ARE duplicates. Answer with ONLY 'YES' or 'NO'."
+     }],
+     "temperature": 0
+   }
+   ```
+
+#### Node 5: IF Node (Check Result)
+
+1. Click **+** → Search "IF"
+2. Configure:
+   - **Condition**: String → Contains
+   - **Value 1**: `{{ $json.choices[0].message.content }}`
+   - **Value 2**: `YES`
+   - **Case Sensitive**: No
+
+3. Connect:
+   - **True output** (is duplicate) → Loop back to "Generate New Topic" node
+   - **False output** (is unique) → Continue to "Create Project"
+
+#### Node 6: Create Project (Your API)
+
+1. Click **+** → Search "HTTP Request"
+2. Configure:
+   - **Method**: POST
+   - **URL**: `http://backend:8000/api/v1/automation/generate`
+   - **Headers**: 
+     - `X-API-Key`: `YOUR_AUTOMATION_API_KEY`
+     - `Content-Type`: `application/json`
+   - **Body**:
+   ```json
+   {
+     "topic": "{{ $('Generate New Topic').item.json.choices[0].message.content.replace(/^\"|\"$/g, '') }}",
+     "video_format": "vertical",
+     "background_video": "preset:minecraft_parkour",
+     "background_music": "preset:dreamland",
+     "music_volume": 0.1,
+     "enable_captions": true,
+     "auto_upload": false
+   }
+   ```
+
+#### Node 7: Log to Google Sheet
+
+1. Click **+** → Search "Google Sheets"
+2. Configure:
+   - **Operation**: Append Row
+   - **Document**: Your topic tracker
+   - **Sheet**: Sheet1
+   - **Columns**:
+     - **Date**: `{{ $now.format('YYYY-MM-DD HH:mm') }}`
+     - **Topic**: `{{ $('Generate New Topic').item.json.choices[0].message.content }}`
+     - **Project ID**: `{{ $json.project_id }}`
+     - **Status**: `generating`
+
+### Connecting the Loop
+
+To create the regeneration loop:
+
+1. From the IF node's **True** output (duplicate detected)
+2. Draw a line back to the "Generate New Topic" node
+3. n8n will create a loop that retries until a unique topic is found
+
+### Important Settings
+
+- Set a **max retry** in the IF node settings to prevent infinite loops (e.g., 5 retries)
+- After max retries, you can either:
+  - Stop the workflow
+  - Use the topic anyway with a warning
+  - Send yourself a notification
+
+### Testing Your Workflow
+
+1. Click **Test Workflow** in n8n
+2. Watch each node execute
+3. Check that:
+   - Topics are read from sheet
+   - New topic is generated
+   - AI correctly identifies duplicates
+   - Unique topics get logged
+
+### Activate the Workflow
+
+1. Toggle the **Active** switch in the top right
+2. Your workflow will now run automatically every 5 hours
 
 ---
 
