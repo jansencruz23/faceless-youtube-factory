@@ -220,11 +220,13 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
      "model": "llama-3.3-70b-versatile",
      "messages": [{
        "role": "user",
-       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks in your response\n2. Do NOT include any special characters\n3. Return ONLY the plain topic text, nothing else\n4. Make it COMPLETELY DIFFERENT from these already-used topics:\n{{ ($('Get Existing Topics').all() || []).filter(item => item.json.Topic).map(item => '- ' + String(item.json.Topic).replace(/\"/g, \"'\")).join('\\n') || '(No existing topics yet)' }}"
+       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks in your response\n2. Do NOT include any special characters\n3. Return ONLY the plain topic text, nothing else\n4. Make it COMPLETELY DIFFERENT from these already-used topics:\n{{ ($('Get Existing Topics').all() || []).filter(item => item.json.Topic).map(item => '- ' + String(item.json.Topic).replace(/\"/g, \"'\").replace(/\\n/g, ' ')).join('\\n') || '(No existing topics yet)' }}"
      }],
      "temperature": 0.9
    }
    ```
+   
+   > **Note**: If you get "JSON parameter needs to be valid JSON" errors, the topics may contain special characters. Switch the body to **Expression mode** in n8n instead of JSON mode, which handles escaping automatically.
 
 #### Node 4: Check for Semantic Duplicates (Groq AI)
 
@@ -358,20 +360,44 @@ To update the status in Google Sheets when the video is done, add polling nodes 
    - **Value 2**: `completed`
 
 3. Connect:
-   - **True output** → Update Sheet (completed)
+   - **True output** → Generate Metadata
    - **False output** → Check if failed, or loop back to Wait
 
-#### Node 11: Update Sheet Row (Google Sheets)
+#### Node 11: Generate Metadata (Groq)
+
+1. Click **+** → Search "HTTP Request"
+2. Configure:
+   - **Method**: POST
+   - **URL**: `https://api.groq.com/openai/v1/chat/completions`
+   - **Authentication**: Header Auth (same as Generate Topic)
+   - **Body**:
+   ```json
+   {
+     "model": "llama-3.3-70b-versatile",
+     "messages": [{
+       "role": "user",
+       "content": "Based on this video topic: {{ JSON.stringify($('Generate New Topic').item.json.choices[0].message.content) }}\n\nGenerate social media metadata. Return ONLY valid JSON with no extra text:\n{\"title\": \"catchy title max 60 chars\", \"description\": \"engaging description max 150 chars\", \"hashtags\": \"#tag1 #tag2 #tag3 etc 10 hashtags\"}"
+     }],
+     "temperature": 0.7
+   }
+   ```
+
+#### Node 12: Update Sheet Row (Google Sheets)
 
 1. Click **+** → Search "Google Sheets"
 2. Configure:
    - **Operation**: Update Row
    - **Document**: Your topic tracker
    - **Sheet**: Sheet1
-   - **Row Number**: Find by Project ID (use Lookup)
+   - **Row Number**: Find by Project ID (use Lookup or store row number earlier)
    - **Columns to Update**:
      - **Status**: `completed`
      - **Video Link**: `http://localhost:8000/static/shorts/{{ $('Create Project').item.json.project_id }}.mp4`
+     - **Title**: `{{ JSON.parse($('Generate Metadata').item.json.choices[0].message.content).title }}`
+     - **Description**: `{{ JSON.parse($('Generate Metadata').item.json.choices[0].message.content).description }}`
+     - **Hashtags**: `{{ JSON.parse($('Generate Metadata').item.json.choices[0].message.content).hashtags }}`
+
+> **Tip**: If JSON.parse fails, add a **Code** node before to safely extract the JSON from the LLM response.
 
 ---
 
@@ -386,11 +412,14 @@ To update the status in Google Sheets when the video is done, add polling nodes 
 | C | Project ID | For API reference |
 | D | Status | generating/completed/failed |
 | E | Video Link | Link to video file |
-| F | YouTube | ✓ or blank |
-| G | TikTok | ✓ or blank |
-| H | Instagram | ✓ or blank |
-| I | Facebook | ✓ or blank |
-| J | Notes | Any comments |
+| F | Title | Generated catchy title |
+| G | Description | Social media description |
+| H | Hashtags | Generated hashtags |
+| I | YouTube | Checkbox |
+| J | TikTok | Checkbox |
+| K | Instagram | Checkbox |
+| L | Facebook | Checkbox |
+| M | Notes | Any comments |
 
 ### Color-Coded Status with Dropdown
 
