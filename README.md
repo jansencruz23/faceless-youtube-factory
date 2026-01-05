@@ -2,7 +2,7 @@
 
 AI-powered video generation and multi-platform upload automation. Create engaging short-form videos from text prompts with AI-generated scripts, text-to-speech voices, background music, and automated publishing.
 
-## ✨ Features
+## Features
 
 ### Video Generation
 - **AI Script Generation** - Groq's LLama 3.3 generates engaging multi-speaker video scripts
@@ -23,7 +23,7 @@ AI-powered video generation and multi-platform upload automation. Create engagin
 - **Video Preview** - Download, copy URL, or open videos directly
 - **Voice Casting Studio** - Visual voice assignment with audio preview
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
@@ -41,7 +41,7 @@ AI-powered video generation and multi-platform upload automation. Create engagin
 
 **Pipeline:** Script Writer → Casting Director → Audio Generator → Video Composer → YouTube Uploader
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technologies |
 |-------|-------------|
@@ -50,7 +50,7 @@ AI-powered video generation and multi-platform upload automation. Create engagin
 | **Database** | PostgreSQL, SQLAlchemy, asyncpg |
 | **Automation** | n8n, Docker |
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -90,7 +90,7 @@ Access:
 | `TOKEN_ENCRYPTION_KEY` | Fernet key for OAuth tokens |
 | `AUTOMATION_API_KEY` | Secret key for n8n automation |
 
-## 🤖 n8n Automation
+## n8n Automation
 
 Automate video generation on a schedule or on-demand.
 
