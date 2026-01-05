@@ -92,12 +92,19 @@ Access:
 
 ## n8n Automation
 
-Automate video generation on a schedule or on-demand.
+Automate video generation on a schedule with topic tracking and duplicate prevention.
+
+### Features
+
+- **Scheduled Generation** - Create videos every X hours automatically
+- **Google Sheets Integration** - Track topics, status, and upload progress
+- **AI Topic Deduplication** - LLM checks existing topics to avoid repeats
+- **Status Updates** - Auto-update sheet when video completes
+- **Multi-Platform Tracking** - Checkbox columns for YouTube, TikTok, Instagram, Facebook
 
 ### Automation API
 
 ```bash
-# Create project and generate video
 POST /api/v1/automation/generate
 Header: X-API-Key: your-automation-key
 
@@ -119,9 +126,9 @@ Header: X-API-Key: your-automation-key
 | **Background Video** | `preset:minecraft_parkour`, `preset:subway_surfers_neo` |
 | **Background Music** | `preset:dreamland` |
 
-See [N8N_AUTOMATION.md](docs/N8N_AUTOMATION.md) for full workflow setup.
+See [N8N_AUTOMATION.md](docs/N8N_AUTOMATION.md) for complete workflow setup with Google Sheets.
 
-## 📖 API Reference
+## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|

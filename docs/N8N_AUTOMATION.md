@@ -220,7 +220,7 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
      "model": "llama-3.3-70b-versatile",
      "messages": [{
        "role": "user",
-       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts. The topic should be specific and interesting. Return ONLY the topic text, nothing else."
+       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks in your response\n2. Do NOT include any special characters\n3. Return ONLY the plain topic text, nothing else\n4. Make it COMPLETELY DIFFERENT from these already-used topics:\n{{ ($('Get Existing Topics').all() || []).filter(item => item.json.Topic).map(item => '- ' + String(item.json.Topic).replace(/\"/g, \"'\")).join('\\n') || '(No existing topics yet)' }}"
      }],
      "temperature": 0.9
    }
@@ -271,7 +271,7 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
    - **Body**:
    ```json
    {
-     "topic": "{{ $('Generate New Topic').item.json.choices[0].message.content.replace(/^\"|\"$/g, '') }}",
+     "topic": {{ JSON.stringify($('Generate New Topic').item.json.choices[0].message.content) }},
      "video_format": "vertical",
      "background_video": "preset:minecraft_parkour",
      "background_music": "preset:dreamland",
@@ -324,6 +324,152 @@ To create the regeneration loop:
 
 1. Toggle the **Active** switch in the top right
 2. Your workflow will now run automatically every 5 hours
+
+---
+
+## Polling for Completion (Update Status)
+
+To update the status in Google Sheets when the video is done, add polling nodes after "Create Project".
+
+### Add Polling Nodes
+
+#### Node 8: Wait
+
+1. Click **+** after "Log to Google Sheet" → Search "Wait"
+2. Configure:
+   - **Resume**: After Time Interval
+   - **Wait Amount**: 2
+   - **Wait Unit**: Minutes
+
+#### Node 9: Check Status (HTTP Request)
+
+1. Click **+** → Search "HTTP Request"
+2. Configure:
+   - **Method**: GET
+   - **URL**: `http://backend:8000/api/v1/automation/status/{{ $('Create Project').item.json.project_id }}`
+   - **Headers**: `X-API-Key`: `YOUR_AUTOMATION_API_KEY`
+
+#### Node 10: IF Status Complete
+
+1. Click **+** → Search "IF"
+2. Configure:
+   - **Condition**: String → Equals
+   - **Value 1**: `{{ $json.status }}`
+   - **Value 2**: `completed`
+
+3. Connect:
+   - **True output** → Update Sheet (completed)
+   - **False output** → Check if failed, or loop back to Wait
+
+#### Node 11: Update Sheet Row (Google Sheets)
+
+1. Click **+** → Search "Google Sheets"
+2. Configure:
+   - **Operation**: Update Row
+   - **Document**: Your topic tracker
+   - **Sheet**: Sheet1
+   - **Row Number**: Find by Project ID (use Lookup)
+   - **Columns to Update**:
+     - **Status**: `completed`
+     - **Video Link**: `http://localhost:8000/static/shorts/{{ $('Create Project').item.json.project_id }}.mp4`
+
+---
+
+## Google Sheets Setup (Enhanced)
+
+### Recommended Columns
+
+| Column | Header | Purpose |
+|--------|--------|---------|
+| A | Date | When created |
+| B | Topic | Video topic |
+| C | Project ID | For API reference |
+| D | Status | generating/completed/failed |
+| E | Video Link | Link to video file |
+| F | YouTube | ✓ or blank |
+| G | TikTok | ✓ or blank |
+| H | Instagram | ✓ or blank |
+| I | Facebook | ✓ or blank |
+| J | Notes | Any comments |
+
+### Color-Coded Status with Dropdown
+
+#### Step 1: Create the Dropdown
+
+1. Select the Status column cells (D2:D1000 or your range)
+2. **Data** → **Data validation**
+3. Configure:
+   - **Criteria**: Dropdown
+   - **Options**: `pending`, `generating`, `completed`, `failed`
+4. Click **Done**
+
+#### Step 2: Writing to Dropdown via n8n
+
+n8n writes plain text, which works with dropdowns as long as the text **exactly matches** a dropdown option:
+- Write `completed` not `Completed` or `COMPLETED`
+- Write `generating` not `Generating`
+
+If the text doesn't match, Google Sheets shows a warning but still accepts the value.
+
+#### Step 3: Add Conditional Formatting (Colors)
+
+In Google Sheets, add conditional formatting for the Status column:
+
+1. Select column D (Status column)
+2. **Format** → **Conditional formatting**
+3. Add these rules:
+
+**Rule 1: Completed (Green)**
+- Format cells if: Text is exactly `completed`
+- Formatting style: Green background (#b7e1cd)
+
+**Rule 2: Generating (Yellow)**
+- Format cells if: Text is exactly `generating`
+- Formatting style: Yellow background (#fff2cc)
+
+**Rule 3: Failed (Red)**
+- Format cells if: Text is exactly `failed`
+- Formatting style: Red background (#f4c7c3)
+
+**Rule 4: Pending (Gray)**
+- Format cells if: Text is exactly `pending`
+- Formatting style: Gray background (#d9d9d9)
+
+### Checkboxes for Social Media Platforms
+
+Make columns F-I into checkboxes:
+1. Select columns F through I (under YouTube, TikTok, etc.)
+2. **Insert** → **Checkbox**
+3. Check off each platform after you upload manually
+
+### Video Link Column
+
+The video link points to your local Docker backend. Format options:
+
+**Option 1: Clickable HTTP Link (works in browser)**
+```
+http://localhost:8000/static/shorts/{project_id}.mp4
+```
+
+**Option 2: Local File Path (for reference only)**
+Since Docker stores files in a volume, the actual Windows path is:
+```
+D:\User\Jansen\Self Study\2025 - 12 - DECEMBER\Faceless Youtube Factory\backend\static\shorts\{project_id}.mp4
+```
+
+To make it clickable in Google Sheets:
+1. In the Video Link cell, use this formula:
+```
+=HYPERLINK("http://localhost:8000/static/shorts/"&C2&".mp4", "Open Video")
+```
+(Where C2 is the Project ID cell)
+
+### Example Sheet Layout
+
+| Date | Topic | Project ID | Status | Video Link | YouTube | TikTok | Instagram | Facebook |
+|------|-------|------------|--------|------------|---------|--------|-----------|----------|
+| 2025-01-05 | Why you forget names | abc123 | completed | [Open Video](#) | ☑ | ☐ | ☐ | ☐ |
+| 2025-01-05 | Signs of high IQ | def456 | generating | - | ☐ | ☐ | ☐ | ☐ |
 
 ---
 
