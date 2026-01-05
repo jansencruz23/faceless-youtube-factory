@@ -159,6 +159,65 @@ After status shows `completed` or `published`:
 
 ---
 
+## Avoiding Duplicate Topics (Google Sheets)
+
+Use Google Sheets to track used topics and prevent duplicates.
+
+### Setup
+
+1. Create a Google Sheet with columns:
+   - **A**: Date
+   - **B**: Topic
+   - **C**: Project ID
+   - **D**: Status
+
+### Workflow: Check Before Creating
+
+1. **Generate Topic** (Groq HTTP Request as above)
+
+2. **Read Google Sheet** (Check for duplicates)
+   - Add **Google Sheets** node
+   - **Operation**: Get Many
+   - **Sheet**: Your topic tracker
+   - **Range**: `B:B` (topic column)
+
+3. **IF Node** (Check if topic exists)
+   - Add **IF** node
+   - **Condition**: 
+     ```
+     {{ $json.values.flat().some(t => t.toLowerCase().includes($('Generate Topic').item.json.choices[0].message.content.toLowerCase().substring(0, 20))) }}
+     ```
+   - **True branch**: Loop back to Generate Topic
+   - **False branch**: Continue to Create Project
+
+4. **Create Project** (HTTP Request to automation API)
+
+5. **Append to Google Sheet** (Log the topic)
+   - Add **Google Sheets** node
+   - **Operation**: Append
+   - **Values**:
+     - Date: `{{ $now.format('YYYY-MM-DD') }}`
+     - Topic: `{{ $('Generate Topic').item.json.choices[0].message.content }}`
+     - Project ID: `{{ $json.project_id }}`
+     - Status: `pending`
+
+### Simpler Alternative: Use Groq to Check
+
+Include used topics in the prompt:
+
+```json
+{
+  "model": "llama-3.3-70b-versatile",
+  "messages": [{
+    "role": "user", 
+    "content": "Generate a unique topic for a 60-second video about psychology facts. Do NOT repeat these used topics: [topic1, topic2, topic3]. Return only the new topic."
+  }],
+  "temperature": 0.9
+}
+```
+
+---
+
 ## Troubleshooting
 
 ### n8n not accessible
@@ -174,3 +233,4 @@ docker-compose logs n8n
 ```bash
 docker-compose exec n8n n8n user-management:reset
 ```
+
