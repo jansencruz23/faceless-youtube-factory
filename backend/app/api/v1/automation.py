@@ -66,6 +66,7 @@ class AutoGenerateRequest(BaseModel):
 
     topic: str
     title: str | None = None
+    category: str | None = None  # e.g., "psychology", "motivation", "tech"
 
     # Video format
     video_format: str = "vertical"  # "vertical" or "horizontal"
@@ -128,7 +129,9 @@ async def auto_generate_video(
     title = request.title or f"Auto: {request.topic[:50]}"
 
     # Create project
-    project = await project_crud.create(session=session, user_id=user_id, title=title)
+    project = await project_crud.create(
+        session=session, user_id=user_id, title=title, category=request.category
+    )
 
     # Update status
     await project_crud.update_status(

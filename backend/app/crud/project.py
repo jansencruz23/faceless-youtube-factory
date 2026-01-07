@@ -1,4 +1,5 @@
 """Project CRUD operations."""
+
 from typing import List, Optional, Tuple
 from uuid import UUID
 
@@ -17,12 +18,11 @@ class ProjectCRUD:
         session: AsyncSession,
         user_id: UUID,
         title: str,
+        category: Optional[str] = None,
     ) -> Project:
         """Create a new project."""
         project = Project(
-            user_id=user_id,
-            title=title,
-            status=ProjectStatus.DRAFT
+            user_id=user_id, title=title, category=category, status=ProjectStatus.DRAFT
         )
         session.add(project)
         await session.commit()
@@ -30,10 +30,7 @@ class ProjectCRUD:
         return project
 
     async def get_by_id(
-        self,
-        session: AsyncSession,
-        project_id: UUID,
-        user_id: Optional[UUID]=None
+        self, session: AsyncSession, project_id: UUID, user_id: Optional[UUID] = None
     ) -> Optional[Project]:
         """Get project by ID with optional user filter."""
         stmt = select(Project).where(Project.id == project_id)
@@ -43,10 +40,7 @@ class ProjectCRUD:
         return result.scalar_one_or_none()
 
     async def get_with_relations(
-        self,
-        session: AsyncSession,
-        project_id: UUID,
-        user_id: Optional[UUID]=None
+        self, session: AsyncSession, project_id: UUID, user_id: Optional[UUID] = None
     ) -> Optional[Project]:
         """Get project with all related data."""
         stmt = (
@@ -63,19 +57,23 @@ class ProjectCRUD:
             stmt = stmt.where(Project.user_id == user_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none()
-        
+
     async def list_by_user(
         self,
         session: AsyncSession,
         user_id: UUID,
-        page: int=1,
-        page_size: int=20
+        page: int = 1,
+        page_size: int = 20,
+        category: Optional[str] = None,
     ) -> Tuple[List[Project], int]:
-        """List projects for a user with pagination."""
+        """List projects for a user with pagination and optional category filter."""
+        # Base filter
+        base_filter = Project.user_id == user_id
+        if category:
+            base_filter = base_filter & (Project.category == category)
+
         # Count total
-        count_stmt = select(func.count(Project.id)).where(
-            Project.user_id == user_id
-        )
+        count_stmt = select(func.count(Project.id)).where(base_filter)
         total_result = await session.execute(count_stmt)
         total = total_result.scalar() or 0
 
@@ -83,7 +81,7 @@ class ProjectCRUD:
         offset = (page - 1) * page_size
         stmt = (
             select(Project)
-            .where(Project.user_id == user_id)
+            .where(base_filter)
             .order_by(Project.created_at.desc())
             .offset(offset)
             .limit(page_size)
@@ -98,7 +96,7 @@ class ProjectCRUD:
         session: AsyncSession,
         project_id: UUID,
         status: ProjectStatus,
-        error_message: Optional[str]=None
+        error_message: Optional[str] = None,
     ) -> Optional[Project]:
         """Update project status."""
         project = await session.get(Project, project_id)
@@ -111,9 +109,7 @@ class ProjectCRUD:
         return project
 
     async def get_latest_script(
-        self,
-        session: AsyncSession,
-        project_id: UUID
+        self, session: AsyncSession, project_id: UUID
     ) -> Optional[Script]:
         """Get the latest script version for a project."""
         stmt = (
@@ -126,9 +122,7 @@ class ProjectCRUD:
         return result.scalar_one_or_none()
 
     async def get_latest_cast(
-        self,
-        session: AsyncSession,
-        project_id: UUID
+        self, session: AsyncSession, project_id: UUID
     ) -> Optional[Cast]:
         """Get the latest cast for a project."""
         stmt = (
