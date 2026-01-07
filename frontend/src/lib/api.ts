@@ -256,3 +256,22 @@ export async function uploadToYouTube(
         token,
     });
 }
+
+// ============ Automation API ============
+
+export async function listAutomationProjects(
+    apiKey: string,
+    category?: string,
+    page = 1,
+    pageSize = 50
+): Promise<{ items: Project[]; total: number; page: number; page_size: number }> {
+    let url = `/api/v1/automation/projects?page=${page}&page_size=${pageSize}`;
+    if (category) {
+        url += `&category=${encodeURIComponent(category)}`;
+    }
+    return fetchAPI(url, {
+        headers: {
+            "X-API-Key": apiKey,
+        },
+    });
+}

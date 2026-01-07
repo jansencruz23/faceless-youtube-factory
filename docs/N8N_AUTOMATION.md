@@ -201,7 +201,16 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
    - **Document**: Select your topic tracker spreadsheet
    - **Sheet**: Sheet1 (or your sheet name)
    - **Options** → **Data Location**: First row is header
-3. This outputs all your existing topics
+3. This outputs all your existing topics (one item per row)
+
+#### Node 2.5: Aggregate (Prevent Multiple Executions)
+
+Without this node, subsequent nodes run once per sheet row. Add Aggregate to combine all rows into a single item:
+
+1. Click **+** → Search "Aggregate"
+2. Configure:
+   - **Aggregate**: All Item Data (Into a Single List)
+3. Now subsequent nodes only run once
 
 #### Node 3: Generate New Topic (Groq)
 
@@ -213,22 +222,38 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
      - Name: `Authorization`
      - Value: `Bearer YOUR_GROQ_API_KEY`
    - **Headers**: Add `Content-Type`: `application/json`
-   - **Body Content Type**: JSON
-   - **Body**:
-   ```json
-   {
-     "model": "llama-3.3-70b-versatile",
-     "messages": [{
-       "role": "user",
-       "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks in your response\n2. Do NOT include any special characters\n3. Return ONLY the plain topic text, nothing else\n4. Make it COMPLETELY DIFFERENT from these already-used topics:\n{{ ($('Get Existing Topics').all() || []).filter(item => item.json.Topic).map(item => '- ' + String(item.json.Topic).replace(/\"/g, \"'\").replace(/\\n/g, ' ')).join('\\n') || '(No existing topics yet)' }}"
-     }],
-     "temperature": 0.9
-   }
-   ```
-   
-   > **Note**: If you get "JSON parameter needs to be valid JSON" errors, the topics may contain special characters. Switch the body to **Expression mode** in n8n instead of JSON mode, which handles escaping automatically.
+   - **Body Content Type**: n8n (for expressions)
+   - **Specify Body**: Using Fields Below
+
+3. **IMPORTANT**: Instead of JSON mode, use the expression builder:
+   - Click **Add Field** → Name: `model`, Value: `llama-3.3-70b-versatile`
+   - Click **Add Field** → Name: `temperature`, Value: `0.9`
+   - Click **Add Field** → Name: `messages`, Value (toggle to Expression):
+
+```javascript
+[{
+  "role": "user",
+  "content": "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks in your response\n2. Do NOT include any special characters\n3. Return ONLY the plain topic text, nothing else\n4. Make it COMPLETELY DIFFERENT from these already-used topics:\n" + (($('Get Existing Topics').all() || []).filter(item => item.json.Topic).map(item => '- ' + String(item.json.Topic).replace(/"/g, "'").replace(/\n/g, ' ')).join('\n') || '(No existing topics yet)')
+}]
+```
+
+**Alternative: Full Expression Mode Body**
+
+If the above doesn't work, set **Body Content Type** to **Expression** and paste:
+
+```javascript
+{{ JSON.stringify({
+  model: "llama-3.3-70b-versatile",
+  messages: [{
+    role: "user",
+    content: "Generate a unique, engaging topic for a 60-second vertical video about psychology and human behavior facts.\n\nIMPORTANT RULES:\n1. Do NOT use quotation marks\n2. Do NOT include special characters\n3. Return ONLY plain topic text\n4. Make it COMPLETELY DIFFERENT from these used topics:\n" + (($('Get Existing Topics').all() || []).filter(i => i.json.Topic).map(i => '- ' + String(i.json.Topic).replace(/"/g, "'").replace(/\n/g, ' ')).join('\n') || '(No existing topics)')
+  }],
+  temperature: 0.9
+}) }}
 
 #### Node 4: Check for Semantic Duplicates (Groq AI)
+
+> **Note**: This node is optional. Since Node 3 already includes existing topics in the prompt, this duplicate check is extra protection. You can skip this node if you want a simpler workflow.
 
 1. Click **+** → Search "HTTP Request" 
 2. Rename to "Check Duplicate"
@@ -236,17 +261,19 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
    - **Method**: POST
    - **URL**: `https://api.groq.com/openai/v1/chat/completions`
    - **Authentication**: Same as above
+   - **Body Content Type**: Expression
    - **Body**:
-   ```json
-   {
-     "model": "llama-3.3-70b-versatile",
-     "messages": [{
-       "role": "user",
-       "content": "I have these existing video topics:\n{{ $('Get Existing Topics').all().map(item => '- ' + item.json.Topic).join('\\n') }}\n\nNew proposed topic: \"{{ $('Generate New Topic').item.json.choices[0].message.content }}\"\n\nIs the new topic semantically too similar to ANY existing topic? Topics about the same concept but with different wording ARE duplicates. Answer with ONLY 'YES' or 'NO'."
-     }],
-     "temperature": 0
-   }
-   ```
+   
+```javascript
+{{ JSON.stringify({
+  model: "llama-3.3-70b-versatile",
+  messages: [{
+    role: "user",
+    content: "I have these existing video topics:\n" + ($('Aggregate').first().json.data || []).filter(i => i.Topic).map(i => '- ' + i.Topic).join('\n') + "\n\nNew proposed topic: \"" + $('Generate New Topic').first().json.choices[0].message.content + "\"\n\nIs the new topic semantically too similar to ANY existing topic? Answer ONLY 'YES' or 'NO'."
+  }],
+  temperature: 0
+}) }}
+```
 
 #### Node 5: IF Node (Check Result)
 
@@ -270,19 +297,21 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
    - **Headers**: 
      - `X-API-Key`: `YOUR_AUTOMATION_API_KEY`
      - `Content-Type`: `application/json`
+   - **Body Content Type**: Expression
    - **Body**:
-   ```json
-   {
-     "topic": {{ JSON.stringify($('Generate New Topic').item.json.choices[0].message.content) }},
-     "category": "psychology",
-     "video_format": "vertical",
-     "background_video": "preset:minecraft_parkour",
-     "background_music": "preset:dreamland",
-     "music_volume": 0.1,
-     "enable_captions": true,
-     "auto_upload": false
-   }
-   ```
+
+```javascript
+{{ JSON.stringify({
+  topic: $('Generate New Topic').first().json.choices[0].message.content,
+  category: "psychology",
+  video_format: "vertical",
+  background_video: "preset:minecraft_parkour",
+  background_music: "preset:dreamland",
+  music_volume: 0.1,
+  enable_captions: true,
+  auto_upload: false
+}) }}
+```
    
    > **Tip**: Use a different `category` value for each n8n workflow/channel (e.g., "psychology", "motivation", "tech facts"). Videos will be grouped by category in the UI.
 
