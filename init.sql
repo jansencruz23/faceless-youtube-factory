@@ -26,6 +26,7 @@ CREATE TABLE projects (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     title VARCHAR(255) NOT NULL,
+    category VARCHAR(100),
     status project_status DEFAULT 'draft',
     youtube_video_id VARCHAR(50),
     youtube_url VARCHAR(500),
@@ -33,6 +34,7 @@ CREATE TABLE projects (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX idx_projects_category ON projects(category);
 -- Scripts table
 CREATE TABLE scripts (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
