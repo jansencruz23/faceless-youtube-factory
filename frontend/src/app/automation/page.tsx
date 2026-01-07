@@ -185,7 +185,7 @@ export default function AutomationPage() {
                         const StatusIcon = config.icon;
                         const isProcessing = ["generating_script", "casting", "generating_images", "generating_audio", "generating_video", "uploading_youtube"].includes(project.status);
                         return (
-                            <Link key={project.id} href={`/projects/${project.id}`}>
+                            <Link key={project.id} href={`/automation/${project.id}`}>
                                 <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                                     <CardContent className="flex items-center justify-between py-4">
                                         <div className="flex items-center gap-4">

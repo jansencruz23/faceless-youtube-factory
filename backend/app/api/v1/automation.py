@@ -273,3 +273,90 @@ async def list_automation_projects(
         "page": page,
         "page_size": page_size,
     }
+
+
+@router.get("/projects/{project_id}")
+async def get_automation_project(
+    project_id: UUID,
+    session: AsyncSession = Depends(get_session),
+    _api_key: str = Depends(verify_api_key),
+):
+    """
+    Get automation project details.
+
+    This allows viewing projects created by the automation system.
+    Requires X-API-Key header with valid AUTOMATION_API_KEY.
+    """
+    # Get automation user
+    result = await session.execute(
+        select(User).where(User.email == AUTOMATION_USER_EMAIL)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Automation user not found")
+
+    # Get project - only if owned by automation user
+    project = await project_crud.get_with_relations(
+        session=session, project_id=project_id, user_id=user.id
+    )
+
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    # Build response
+    response = {
+        "id": str(project.id),
+        "title": project.title,
+        "category": project.category,
+        "status": project.status.value,
+        "youtube_video_id": project.youtube_video_id,
+        "youtube_url": project.youtube_url,
+        "error_message": project.error_message,
+        "created_at": project.created_at.isoformat(),
+        "updated_at": project.updated_at.isoformat(),
+        "script": None,
+        "cast": None,
+        "assets": [],
+    }
+
+    # Add script if exists
+    if project.scripts:
+        latest_script = max(project.scripts, key=lambda s: s.version)
+        scenes_data = latest_script.content.get("scenes", [])
+        response["script"] = {
+            "id": str(latest_script.id),
+            "version": latest_script.version,
+            "scenes": [
+                {
+                    "speaker": s.get("speaker", ""),
+                    "line": s.get("line", ""),
+                    "duration": s.get("duration", 3.0),
+                }
+                for s in scenes_data
+            ],
+            "created_at": latest_script.created_at.isoformat(),
+        }
+
+    # Add cast if exists
+    if project.casts:
+        latest_cast = max(project.casts, key=lambda c: c.created_at)
+        response["cast"] = {
+            "id": str(latest_cast.id),
+            "assignments": latest_cast.assignments or {},
+            "created_at": latest_cast.created_at.isoformat(),
+        }
+
+    # Add assets
+    if project.assets:
+        response["assets"] = [
+            {
+                "id": str(a.id),
+                "type": a.asset_type.value if a.asset_type else "unknown",
+                "url": a.file_path,
+                "created_at": a.created_at.isoformat(),
+            }
+            for a in project.assets
+        ]
+
+    return response
