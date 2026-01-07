@@ -275,3 +275,14 @@ export async function listAutomationProjects(
         },
     });
 }
+
+export async function getAutomationProject(
+    apiKey: string,
+    projectId: string
+): Promise<ProjectDetail> {
+    return fetchAPI(`/api/v1/automation/projects/${projectId}`, {
+        headers: {
+            "X-API-Key": apiKey,
+        },
+    });
+}

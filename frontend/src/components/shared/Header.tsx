@@ -6,7 +6,7 @@ import { UserButton } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useApi } from "@/lib/useApi";
-import { Youtube, Plus, Zap } from "lucide-react";
+import { Youtube, Plus, Zap, Bot } from "lucide-react";
 
 export function Header() {
     const api = useApi();
@@ -46,6 +46,14 @@ export function Header() {
                                 </Badge>
                             </Link>
                         )}
+
+                        {/* Automation */}
+                        <Link href="/automation">
+                            <Badge variant="outline" className="gap-1 cursor-pointer hover:bg-secondary">
+                                <Bot className="h-3 w-3" />
+                                Automation
+                            </Badge>
+                        </Link>
 
                         {/* New Project */}
                         <Link href="/projects/new">
