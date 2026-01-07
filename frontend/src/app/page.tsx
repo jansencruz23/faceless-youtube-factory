@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Link from "next/link";
 import { useApi } from "@/lib/useApi";
@@ -7,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ProjectStatus } from "@/types";
-import { Play, Youtube, AlertCircle, Clock, CheckCircle2, Loader2, Image } from "lucide-react";
+import { Play, Youtube, AlertCircle, Clock, CheckCircle2, Loader2, Folder } from "lucide-react";
 
 const statusConfig: Record<ProjectStatus, { label: string; variant: "default" | "secondary" | "destructive" | "success" | "warning"; icon: React.ElementType }> = {
   draft: { label: "Draft", variant: "secondary", icon: Clock },
@@ -24,12 +25,23 @@ const statusConfig: Record<ProjectStatus, { label: string; variant: "default" | 
 
 export default function DashboardPage() {
   const api = useApi();
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>(undefined);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["projects"],
-    queryFn: () => api.listProjects(),
+    queryKey: ["projects", selectedCategory],
+    queryFn: () => api.listProjects(1, 100, selectedCategory),
     refetchInterval: 5000,
   });
+
+  // Get unique categories from all projects (fetch all first)
+  const { data: allData } = useQuery({
+    queryKey: ["projects-all"],
+    queryFn: () => api.listProjects(1, 100),
+  });
+
+  const categories = allData?.items
+    ? [...new Set(allData.items.map(p => p.category).filter(Boolean))]
+    : [];
 
   if (isLoading) {
     return (
@@ -60,6 +72,31 @@ export default function DashboardPage() {
           {data?.total || 0} project{data?.total !== 1 ? "s" : ""}
         </p>
       </div>
+
+      {/* Category Tabs */}
+      {categories.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant={selectedCategory === undefined ? "default" : "outline"}
+            size="sm"
+            onClick={() => setSelectedCategory(undefined)}
+          >
+            All
+          </Button>
+          {categories.map((cat) => (
+            <Button
+              key={cat}
+              variant={selectedCategory === cat ? "default" : "outline"}
+              size="sm"
+              onClick={() => setSelectedCategory(cat)}
+            >
+              <Folder className="h-3 w-3 mr-1" />
+              {cat}
+            </Button>
+          ))}
+        </div>
+      )}
+
       {data?.items.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -84,9 +121,16 @@ export default function DashboardPage() {
                     <div className="flex items-center gap-4">
                       <div className="flex flex-col">
                         <h3 className="font-semibold">{project.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(project.created_at).toLocaleDateString()}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(project.created_at).toLocaleDateString()}
+                          </p>
+                          {project.category && (
+                            <Badge variant="outline" className="text-xs">
+                              {project.category}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">

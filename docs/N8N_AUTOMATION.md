@@ -274,6 +274,7 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
    ```json
    {
      "topic": {{ JSON.stringify($('Generate New Topic').item.json.choices[0].message.content) }},
+     "category": "psychology",
      "video_format": "vertical",
      "background_video": "preset:minecraft_parkour",
      "background_music": "preset:dreamland",
@@ -282,6 +283,8 @@ Schedule → Get Topics from Sheet → Generate New Topic → Check if Duplicate
      "auto_upload": false
    }
    ```
+   
+   > **Tip**: Use a different `category` value for each n8n workflow/channel (e.g., "psychology", "motivation", "tech facts"). Videos will be grouped by category in the UI.
 
 #### Node 7: Log to Google Sheet
 
