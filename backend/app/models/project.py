@@ -20,6 +20,9 @@ if TYPE_CHECKING:
     from app.models.youtube_metadata import YouTubeMetadata
 
 
+from sqlalchemy import JSON
+
+
 class ProjectBase(SQLModel):
     """Shared project properties."""
 
@@ -40,6 +43,10 @@ class ProjectBase(SQLModel):
     youtube_video_id: Optional[str] = Field(default=None, max_length=50)
     youtube_url: Optional[str] = Field(default=None, max_length=500)
     error_message: Optional[str] = Field(default=None)
+    settings: Optional[dict] = Field(default=None, sa_column=Column(JSON))
+
+    class Config:
+        arbitrary_types_allowed = True
 
 
 class Project(ProjectBase, BaseUUIDModel, table=True):

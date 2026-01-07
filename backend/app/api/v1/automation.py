@@ -128,16 +128,6 @@ async def auto_generate_video(
     # Create title from topic if not provided
     title = request.title or f"Auto: {request.topic[:50]}"
 
-    # Create project
-    project = await project_crud.create(
-        session=session, user_id=user_id, title=title, category=request.category
-    )
-
-    # Update status
-    await project_crud.update_status(
-        session=session, project_id=project.id, status=ProjectStatus.GENERATING_SCRIPT
-    )
-
     # Process background video URL
     background_video_url = None
     if request.background_video:
@@ -157,6 +147,29 @@ async def auto_generate_video(
             background_music_url = f"presets/music/{preset_name}.mp3"
         else:
             background_music_url = request.background_music
+
+    # Create project
+    settings_data = {
+        "video_format": request.video_format,
+        "image_mode": request.image_mode,
+        "background_video_url": background_video_url,
+        "background_music_url": background_music_url,
+        "music_volume": request.music_volume,
+        "enable_captions": request.enable_captions,
+        "auto_upload": request.auto_upload,
+    }
+    project = await project_crud.create(
+        session=session,
+        user_id=user_id,
+        title=title,
+        category=request.category,
+        settings=settings_data,
+    )
+
+    # Update status
+    await project_crud.update_status(
+        session=session, project_id=project.id, status=ProjectStatus.GENERATING_SCRIPT
+    )
 
     # Start pipeline in background
     background_tasks.add_task(

@@ -127,8 +127,18 @@ async def create_project(
     user_id = await ensure_user_exists(session, current_user)
 
     # Create project record
+    settings = {
+        "image_mode": request.image_mode,
+        "scenes_per_image": request.scenes_per_image,
+        "background_image_url": request.background_image_url,
+        "video_format": request.video_format,
+        "background_video_url": request.background_video_url,
+        "background_music_url": request.background_music_url,
+        "music_volume": request.music_volume,
+        "enable_captions": request.enable_captions,
+    }
     project = await project_crud.create(
-        session=session, user_id=user_id, title=request.title
+        session=session, user_id=user_id, title=request.title, settings=settings
     )
 
     # Update status to generating
@@ -414,6 +424,9 @@ async def regenerate_audio(
     cast_assignments = latest_cast.assignments
     project_id_str = str(project_id)
 
+    # Get settings or use defaults
+    project_settings = project.settings or {}
+
     # Find existing image files from the file system
     # Images are saved to static/images/{project_id}/ by image_service
     from pathlib import Path
@@ -429,19 +442,25 @@ async def regenerate_audio(
     num_scenes = len(script_content.get("scenes", []))
     num_images = len(existing_image_files)
     if num_images > 0:
-        # Calculate scenes_per_image from existing ratio
-        scenes_per_image = max(1, num_scenes // num_images) if num_images > 0 else 2
+        # Calculate scenes_per_image from existing ratio or settings
+        target_per_image = project_settings.get("scenes_per_image", 2)
+        # However, we must respect existing images count
+        scenes_per_image = (
+            max(1, num_scenes // num_images) if num_images > 0 else target_per_image
+        )
         image_scene_indices = [
             min(i // scenes_per_image, num_images - 1) for i in range(num_scenes)
         ]
     else:
-        scenes_per_image = 2
+        scenes_per_image = project_settings.get("scenes_per_image", 2)
         image_scene_indices = []
 
-    # Delete existing audio assets
+    # Delete existing audio and video assets
     await session.execute(
         delete(Asset).where(
-            Asset.project_id == project_id, Asset.asset_type == AssetType.AUDIO
+            Asset.project_id == project_id,
+            (Asset.asset_type == AssetType.AUDIO)
+            | (Asset.asset_type == AssetType.VIDEO),
         )
     )
     await session.commit()
@@ -461,7 +480,7 @@ async def regenerate_audio(
                 "project_id": project_id_str,
                 "user_id": str(user_id),
                 "script_prompt": "",
-                "auto_upload": False,
+                "auto_upload": project_settings.get("auto_upload", False),
                 "scenes_per_image": scenes_per_image,
                 "script_json": script_content,
                 "cast_list": cast_assignments,
@@ -477,6 +496,12 @@ async def regenerate_audio(
                 "retry_count": 0,
                 "current_step": "regenerating_audio",
                 "progress": 0.3,
+                # Pass original settings
+                "video_format": project_settings.get("video_format", "vertical"),
+                "background_video_url": project_settings.get("background_video_url"),
+                "background_music_url": project_settings.get("background_music_url"),
+                "music_volume": project_settings.get("music_volume", 0.3),
+                "enable_captions": project_settings.get("enable_captions", True),
             }
 
             # Run audio generator
@@ -578,11 +603,35 @@ async def regenerate_video(
     async def regenerate_task():
         from app.graph.state import GraphState
 
+        # Get settings from project or use defaults
+        # Get settings from project or use defaults
+        project_settings = project.settings or {}
+
+        # Load existing images from file system if mode is per_scene or shared
+        from pathlib import Path
+
+        image_files = []
+        image_scene_indices = []
+
+        images_dir = Path(settings.static_dir) / "images" / str(project_id)
+        if images_dir.exists():
+            png_files = sorted(images_dir.glob("*.png"))
+            if png_files:
+                image_files = [f"images/{project_id}/{f.name}" for f in png_files]
+                # Reconstruct indices logic simply
+                num_scenes = len(latest_script.content.get("scenes", []))
+                num_images = len(image_files)
+                scenes_per_image = project_settings.get("scenes_per_image", 2)
+                image_scene_indices = [
+                    min(i // scenes_per_image, num_images - 1)
+                    for i in range(num_scenes)
+                ]
+
         state: GraphState = {
             "project_id": str(project_id),
             "user_id": str(user_id),
             "script_prompt": "",
-            "auto_upload": False,
+            "auto_upload": project_settings.get("auto_upload", False),
             "script_json": latest_script.content,
             "cast_list": {},
             "audio_files": audio_files,
@@ -593,6 +642,14 @@ async def regenerate_video(
             "retry_count": 0,
             "current_step": "regenerating_video",
             "progress": 0.6,
+            # Pass original settings
+            "video_format": project_settings.get("video_format", "vertical"),
+            "background_video_url": project_settings.get("background_video_url"),
+            "background_music_url": project_settings.get("background_music_url"),
+            "music_volume": project_settings.get("music_volume", 0.3),
+            "enable_captions": project_settings.get("enable_captions", True),
+            "image_files": image_files,
+            "image_scene_indices": image_scene_indices,
         }
 
         state = await video_composer_node(state)

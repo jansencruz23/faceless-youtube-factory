@@ -19,10 +19,15 @@ class ProjectCRUD:
         user_id: UUID,
         title: str,
         category: Optional[str] = None,
+        settings: Optional[dict] = None,
     ) -> Project:
         """Create a new project."""
         project = Project(
-            user_id=user_id, title=title, category=category, status=ProjectStatus.DRAFT
+            user_id=user_id,
+            title=title,
+            category=category,
+            status=ProjectStatus.DRAFT,
+            settings=settings,
         )
         session.add(project)
         await session.commit()

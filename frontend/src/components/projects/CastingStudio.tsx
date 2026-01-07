@@ -21,7 +21,10 @@ interface CastingStudioProps {
     project: ProjectDetail;
 }
 
+import { useAuth } from "@clerk/nextjs";
+
 export function CastingStudio({ project }: CastingStudioProps) {
+    const { getToken } = useAuth();
     const queryClient = useQueryClient();
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [playingCharacter, setPlayingCharacter] = useState<string | null>(null);
@@ -45,14 +48,20 @@ export function CastingStudio({ project }: CastingStudioProps) {
 
     // Preview mutation
     const previewMutation = useMutation({
-        mutationFn: (data: { character: string; settings: VoiceSettings }) =>
-            previewVoice(project.id, {
-                character: data.character,
-                voice_settings: data.settings,
-                sample_text:
-                    project.script?.scenes.find((s) => s.speaker === data.character)?.line ||
-                    "Hello, this is a voice preview.",
-            }),
+        mutationFn: async (data: { character: string; settings: VoiceSettings }) => {
+            const token = await getToken();
+            return previewVoice(
+                project.id,
+                {
+                    character: data.character,
+                    voice_settings: data.settings,
+                    sample_text:
+                        project.script?.scenes.find((s) => s.speaker === data.character)?.line ||
+                        "Hello, this is a voice preview.",
+                },
+                token
+            );
+        },
         onSuccess: (data, variables) => {
             if (audioRef.current) {
                 audioRef.current.src = getStaticUrl(data.audio_url);
@@ -64,7 +73,10 @@ export function CastingStudio({ project }: CastingStudioProps) {
 
     // Save cast mutation
     const saveMutation = useMutation({
-        mutationFn: () => updateCast(project.id, editedAssignments),
+        mutationFn: async () => {
+            const token = await getToken();
+            return updateCast(project.id, editedAssignments, token);
+        },
         onSuccess: () => {
             setHasChanges(false);
             queryClient.invalidateQueries({ queryKey: ["project", project.id] });
@@ -73,7 +85,10 @@ export function CastingStudio({ project }: CastingStudioProps) {
 
     // Regenerate audio mutation
     const regenerateMutation = useMutation({
-        mutationFn: () => regenerateAudio(project.id),
+        mutationFn: async () => {
+            const token = await getToken();
+            return regenerateAudio(project.id, token);
+        },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ["project", project.id] });
         },

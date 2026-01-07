@@ -31,9 +31,12 @@ CREATE TABLE projects (
     youtube_video_id VARCHAR(50),
     youtube_url VARCHAR(500),
     error_message TEXT,
+    settings JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+-- Add migration for existing databases
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS settings JSONB;
 CREATE INDEX idx_projects_category ON projects(category);
 -- Scripts table
 CREATE TABLE scripts (
