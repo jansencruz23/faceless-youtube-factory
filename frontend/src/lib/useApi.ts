@@ -18,9 +18,9 @@ export function useApi() {
             const token = await getToken();
             return api.createProject(data, token);
         },
-        listProjects: async (page = 1, pageSize = 20) => {
+        listProjects: async (page = 1, pageSize = 20, category?: string) => {
             const token = await getToken();
-            return api.listProjects(page, pageSize, token);
+            return api.listProjects(page, pageSize, token, category);
         },
         getProject: async (id: string) => {
             const token = await getToken();

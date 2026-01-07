@@ -96,9 +96,14 @@ export async function createProject(data: {
 export async function listProjects(
     page = 1,
     pageSize = 20,
-    token?: string | null
+    token?: string | null,
+    category?: string
 ): Promise<{ items: Project[]; total: number; page: number; page_size: number }> {
-    return fetchAPI(`/api/v1/projects?page=${page}&page_size=${pageSize}`, { token });
+    let url = `/api/v1/projects?page=${page}&page_size=${pageSize}`;
+    if (category) {
+        url += `&category=${encodeURIComponent(category)}`;
+    }
+    return fetchAPI(url, { token });
 }
 
 export async function getProject(id: string, token?: string | null): Promise<ProjectDetail> {

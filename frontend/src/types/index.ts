@@ -15,6 +15,7 @@ export type PrivacyStatus = "public" | "private" | "unlisted";
 export interface Project {
     id: string;
     title: string;
+    category?: string;
     status: ProjectStatus;
     youtube_video_id?: string;
     youtube_url?: string;
