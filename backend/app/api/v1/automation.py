@@ -220,3 +220,56 @@ async def get_project_status(
         "youtube_url": project.youtube_url,
         "error_message": project.error_message,
     }
+
+
+@router.get("/projects")
+async def list_automation_projects(
+    category: str | None = None,
+    page: int = 1,
+    page_size: int = 50,
+    session: AsyncSession = Depends(get_session),
+    _api_key: str = Depends(verify_api_key),
+):
+    """
+    List all automation projects with optional category filter.
+
+    This shows projects created by the automation system user.
+    Requires X-API-Key header with valid AUTOMATION_API_KEY.
+    """
+    # Get automation user ID
+    result = await session.execute(
+        select(User).where(User.email == AUTOMATION_USER_EMAIL)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return {"items": [], "total": 0, "page": page, "page_size": page_size}
+
+    # List projects for automation user
+    items, total = await project_crud.list_by_user(
+        session=session,
+        user_id=user.id,
+        page=page,
+        page_size=page_size,
+        category=category,
+    )
+
+    return {
+        "items": [
+            {
+                "id": str(p.id),
+                "title": p.title,
+                "category": p.category,
+                "status": p.status.value,
+                "youtube_video_id": p.youtube_video_id,
+                "youtube_url": p.youtube_url,
+                "error_message": p.error_message,
+                "created_at": p.created_at.isoformat(),
+                "updated_at": p.updated_at.isoformat(),
+            }
+            for p in items
+        ],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    }
