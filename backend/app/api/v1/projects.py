@@ -211,13 +211,18 @@ async def upload_background(
 async def list_projects(
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
+    category: Optional[str] = Query(None, description="Filter by category"),
     session: AsyncSession = Depends(get_session),
     current_user: ClerkUser = Depends(get_current_user),
 ):
-    """List all projects for the current user."""
+    """List all projects for the current user with optional category filter."""
     user_id = get_user_uuid(current_user)
     items, total = await project_crud.list_by_user(
-        session=session, user_id=user_id, page=page, page_size=page_size
+        session=session,
+        user_id=user_id,
+        page=page,
+        page_size=page_size,
+        category=category,
     )
 
     return ProjectListResponse(
@@ -225,6 +230,7 @@ async def list_projects(
             ProjectResponse(
                 id=p.id,
                 title=p.title,
+                category=p.category,
                 status=p.status.value,
                 youtube_video_id=p.youtube_video_id,
                 youtube_url=p.youtube_url,

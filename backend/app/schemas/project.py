@@ -61,6 +61,7 @@ class ProjectResponse(BaseModel):
 
     id: UUID
     title: str
+    category: Optional[str] = None
     status: str
     youtube_video_id: Optional[str] = None
     youtube_url: Optional[str] = None
