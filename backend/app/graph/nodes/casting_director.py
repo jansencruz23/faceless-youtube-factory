@@ -354,6 +354,7 @@ For each character, select a voice that matches:
 1. The character's name and apparent personality based on their name and dialogue
 2. The tone and style of their speech
 3. Ensure voice variety - don't assign the same voice to multiple characters
+4. If the user specified a voice and pitch, use it directly
 
 Also suggest pitch and rate adjustments:
 - pitch: from -10Hz to +10Hz (negative = deeper, positive = higher)
