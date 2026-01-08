@@ -23,21 +23,39 @@ from app.services.encryption_service import encryption_service
 from app.models import ProjectStatus
 from app.config import settings
 from app.utils.logging import get_logger
+from app.auth import ClerkUser, get_current_user
 
 router = APIRouter()
 logger = get_logger(__name__)
 
-DEFAULT_USER_ID = UUID("00000000-0000-0000-0000-000000000001")
+
+def get_user_uuid(clerk_user: ClerkUser) -> UUID:
+    """
+    Convert Clerk user ID to UUID for database operations.
+    Clerk IDs are strings like 'user_2abc123', we need to create a deterministic UUID.
+    """
+    import hashlib
+
+    # Create a deterministic UUID from the Clerk user ID
+    hash_bytes = hashlib.md5(clerk_user.user_id.encode()).digest()
+    return UUID(bytes=hash_bytes)
 
 
 @router.get("/auth-url", response_model=YouTubeAuthUrlResponse)
-async def get_auth_url():
+async def get_auth_url(
+    current_user: ClerkUser = Depends(get_current_user),
+):
     """
     Generate OAuth authorization URL for YouTube.
 
     Frontend should redirect user to this URL to initiate OAuth flow.
+    The user_id is embedded in the state parameter for the callback to use.
     """
-    auth_url, state = youtube_service.get_auth_url()
+    # Get user UUID to embed in state
+    user_id = get_user_uuid(current_user)
+    custom_state = f"user_id:{user_id}"
+
+    auth_url, state = youtube_service.get_auth_url(custom_state=custom_state)
 
     return YouTubeAuthUrlResponse(auth_url=auth_url, state=state)
 
@@ -61,10 +79,19 @@ async def youtube_callback(
         # Get channel info
         channel_info = await youtube_service.get_channel_info(token_data["token"])
 
+        # Get user_id from state (passed during OAuth initiation)
+        # State format: "user_id:<uuid>" or just random for backwards compatibility
+        user_id = None
+        if state and state.startswith("user_id:"):
+            user_id = UUID(state.replace("user_id:", ""))
+        else:
+            # Fall back to default user for backwards compatibility
+            user_id = UUID("00000000-0000-0000-0000-000000000001")
+
         # Save connection
         await youtube_crud.create_connection(
             session=session,
-            user_id=DEFAULT_USER_ID,
+            user_id=user_id,
             channel_id=channel_info["channel_id"],
             channel_title=channel_info["title"],
             access_token=token_data["token"],
@@ -92,10 +119,13 @@ async def youtube_callback(
 
 
 @router.get("/connection", response_model=YouTubeConnectionResponse)
-async def get_connection_status(session: AsyncSession = Depends(get_session)):
+async def get_connection_status(
+    session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
+):
     """Check if user has an active YouTube connection."""
     connection = await youtube_crud.get_connection(
-        session=session, user_id=DEFAULT_USER_ID
+        session=session, user_id=get_user_uuid(current_user)
     )
 
     if connection:
@@ -109,10 +139,13 @@ async def get_connection_status(session: AsyncSession = Depends(get_session)):
 
 
 @router.delete("/disconnect")
-async def disconnect_youtube(session: AsyncSession = Depends(get_session)):
+async def disconnect_youtube(
+    session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
+):
     """Disconnect YouTube account."""
     success = await youtube_crud.deactivate_connection(
-        session=session, user_id=DEFAULT_USER_ID
+        session=session, user_id=get_user_uuid(current_user)
     )
 
     if not success:
@@ -120,7 +153,7 @@ async def disconnect_youtube(session: AsyncSession = Depends(get_session)):
             status_code=404, detail="No active YouTube connection found"
         )
 
-    logger.info("YouTube disconnected", user_id=str(DEFAULT_USER_ID))
+    logger.info("YouTube disconnected", user_id=str(get_user_uuid(current_user)))
 
     return {"message": "YouTube disconnected successfully"}
 
@@ -132,6 +165,7 @@ async def generate_metadata(
     project_id: UUID,
     request: YouTubeMetadataRequest,
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """
     Generate SEO-optimized YouTube metadata using AI.
@@ -139,7 +173,7 @@ async def generate_metadata(
     Uses the project's script content to generate title, description, and tags.
     """
     project = await project_crud.get_with_relations(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=get_user_uuid(current_user)
     )
 
     if not project:
@@ -184,6 +218,7 @@ async def upload_to_youtube(
     request: YouTubeUploadRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_session),
+    current_user: ClerkUser = Depends(get_current_user),
 ):
     """
     Upload completed video to YouTube.
@@ -194,7 +229,7 @@ async def upload_to_youtube(
     """
     # Get project
     project = await project_crud.get_with_relations(
-        session=session, project_id=project_id, user_id=DEFAULT_USER_ID
+        session=session, project_id=project_id, user_id=get_user_uuid(current_user)
     )
 
     if not project:
@@ -208,7 +243,7 @@ async def upload_to_youtube(
 
     # Check YouTube connection
     connection = await youtube_crud.get_connection(
-        session=session, user_id=DEFAULT_USER_ID
+        session=session, user_id=get_user_uuid(current_user)
     )
 
     if not connection:

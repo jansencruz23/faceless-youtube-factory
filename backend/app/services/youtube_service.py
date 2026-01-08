@@ -26,10 +26,13 @@ SCOPES = [
 class YouTubeService:
     """Service for YouTube API interactions."""
 
-    def get_auth_url(self) -> Tuple[str, str]:
+    def get_auth_url(self, custom_state: str = None) -> Tuple[str, str]:
         """
         Generate OAuth authorization URL.
         Returns (authorization_url, state).
+
+        Args:
+            custom_state: Optional custom state to use (e.g., to embed user_id)
         """
         # Create flow instance to manage the OAuth 2.0 Authorization Grant Flow steps
         flow = google_auth_oauthlib.flow.Flow.from_client_config(
@@ -46,14 +49,21 @@ class YouTubeService:
 
         flow.redirect_uri = settings.oauth_redirect_uri
 
-        authorization_url, state = flow.authorization_url(
+        # Build authorization URL kwargs
+        auth_kwargs = {
             # Enable offline access so that you can refresh an access token without
             # re-prompting the user for permission. Recommended for moving to
             # server-side access.
-            access_typ="offline",
-            include_granted_scopes="true",
-            prompt="consent",
-        )
+            "access_type": "offline",
+            "include_granted_scopes": "true",
+            "prompt": "consent",
+        }
+
+        # Use custom state if provided
+        if custom_state:
+            auth_kwargs["state"] = custom_state
+
+        authorization_url, state = flow.authorization_url(**auth_kwargs)
 
         return authorization_url, state
 
