@@ -33,6 +33,10 @@ venv/
 *.txt
 *.sqlite
 *.db
+
+# Keep n8n workflows tracked
+!n8n/
+!n8n/*.json
 client_secret_1083945421718-o39uj80ee4kred8382qv51lmc23fqvts.apps.googleusercontent.com.json
 
 # Log files
