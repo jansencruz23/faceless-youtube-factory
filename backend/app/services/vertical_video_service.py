@@ -225,12 +225,12 @@ class VerticalVideoService:
         logger.info(f"Video created in {elapsed:.1f}s: {output_path}")
 
     def _generate_animated_ass(self, words: List[dict], output_path: Path) -> None:
-        """Generate ASS subtitles with enhanced TikTok-style animations."""
+        """Generate ASS subtitles with clean, punchy animations."""
 
-        # Enhanced ASS header with multiple styles for variety
-        # Modern TikTok/Shorts style captions with glow, shadow, and bold text
+        # Clean, bold style with thick black outline for readability
+        # Larger font (130pt), thick outline (8px), strong shadow
         ass_content = f"""[Script Info]
-Title: Enhanced Animated Captions
+Title: Animated Captions
 ScriptType: v4.00+
 PlayResX: {WIDTH}
 PlayResY: {HEIGHT}
@@ -238,15 +238,13 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Pop,Impact,120,&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,2,0,1,5,3,5,10,10,350,1
-Style: Highlight,Impact,120,&H0000FFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,2,0,1,5,3,5,10,10,350,1
-Style: Glow,Impact,120,&H00FFFFFF,&H0000FFFF,&H0000FFFF,&HCC000000,1,0,0,0,100,100,2,0,1,6,4,5,10,10,350,1
+Style: Pop,Impact,130,&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,3,0,1,8,4,5,10,10,350,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-        for i, word_info in enumerate(words):
+        for word_info in words:
             start_time = self._seconds_to_ass_time(word_info["start"])
             end_time = self._seconds_to_ass_time(word_info["end"])
             word = word_info["word"].upper()
@@ -256,37 +254,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
             # Calculate animation timing
             duration_ms = int((word_info["end"] - word_info["start"]) * 1000)
-            pop_in = min(80, duration_ms // 4)  # Pop in time
-            settle = min(60, duration_ms // 5)  # Settle time
+            pop_time = min(50, duration_ms // 4)  # Quick pop (50ms max)
+            settle_time = min(40, duration_ms // 5)  # Quick settle
 
-            # Enhanced animation with multiple effects:
-            # 1. Scale pop (0 -> 115% -> 100%)
-            # 2. Color flash (yellow highlight -> white)
-            # 3. Blur to sharp effect
-            # 4. Subtle y-position bounce
+            # Clean pop animation:
+            # - Start at 0% scale
+            # - Pop to 120% quickly (surprising overshoot)
+            # - Settle to 100% smoothly
             animated_text = (
-                # Start invisible and small
-                f"{{\\fscx0\\fscy0\\bord8\\blur3"
-                # Pop up with overshoot, yellow highlight
-                f"\\t(0,{pop_in},\\fscx115\\fscy115\\bord5\\blur0\\1c&H00FFFF&)"
-                # Settle to normal size, transition to white
-                f"\\t({pop_in},{pop_in + settle},\\fscx100\\fscy100\\bord5\\1c&HFFFFFF&)"
+                f"{{\\fscx0\\fscy0"
+                f"\\t(0,{pop_time},\\fscx120\\fscy120)"
+                f"\\t({pop_time},{pop_time + settle_time},\\fscx100\\fscy100)"
                 f"}}{word}"
             )
 
-            # Use Glow style for emphasis words (longer words or every few words)
-            style = "Pop"
-            if len(word) > 6 or i % 5 == 0:
-                style = "Glow"
-
             ass_content += (
-                f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{animated_text}\n"
+                f"Dialogue: 0,{start_time},{end_time},Pop,,0,0,0,,{animated_text}\n"
             )
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(ass_content)
 
-        logger.info(f"  Generated enhanced animated ASS with {len(words)} words")
+        logger.info(f"  Generated animated ASS with {len(words)} words")
 
     def _seconds_to_ass_time(self, seconds: float) -> str:
         """Convert seconds to ASS time format (H:MM:SS.CC)"""
@@ -458,19 +447,18 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 scene_video_path = self.temp_dir / f"scene_{i}.mp4"
 
                 if img_path and img_path.exists():
-                    # Create video from image with Ken Burns effect
-                    # Random zoom direction
-                    zoom_start = random.uniform(1.0, 1.05)
-                    zoom_end = random.uniform(1.05, 1.15)
-                    if random.choice([True, False]):
-                        zoom_start, zoom_end = zoom_end, zoom_start
+                    # Create video from image with subtle Ken Burns effect
+                    # Just slow zoom, no pan to avoid bouncing
+                    total_frames = int(duration * 24)
 
-                    # Zoom expression: interpolate from zoom_start to zoom_end over duration
-                    zoom_expr = f"zoom='if(lte(zoom,1.0),{zoom_start},min(zoom+{(zoom_end - zoom_start) / duration / 24:.8f},{zoom_end}))'"
-
-                    # Pan expression for subtle movement
-                    pan_x = random.uniform(-0.02, 0.02)
-                    pan_y = random.uniform(-0.02, 0.02)
+                    # Random zoom: either zoom in or zoom out slightly
+                    zoom_in = random.choice([True, False])
+                    if zoom_in:
+                        # Zoom in: 1.0 -> 1.1
+                        zoom_expr = f"zoom=min(1.0+on/{total_frames}*0.1,1.1)"
+                    else:
+                        # Zoom out: 1.1 -> 1.0
+                        zoom_expr = f"zoom=max(1.1-on/{total_frames}*0.1,1.0)"
 
                     cmd = [
                         "ffmpeg",
@@ -480,7 +468,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         "-i",
                         str(img_path),
                         "-filter_complex",
-                        f"[0:v]scale=8000:-1,zoompan={zoom_expr}:x='iw/2-(iw/zoom/2)+({pan_x}*on)':y='ih/2-(ih/zoom/2)+({pan_y}*on)':d={int(duration * 24)}:s={WIDTH}x{HEIGHT}:fps=24[v]",
+                        f"[0:v]scale=4000:-1,zoompan={zoom_expr}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s={WIDTH}x{HEIGHT}:fps=24[v]",
                         "-map",
                         "[v]",
                         "-c:v",
