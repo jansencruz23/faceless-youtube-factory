@@ -135,15 +135,16 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       {project.youtube_url && (
-                        <a
-                          href={project.youtube_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-red-500 hover:text-red-400"
+                        <span
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            window.open(project.youtube_url, "_blank", "noopener,noreferrer");
+                          }}
+                          className="text-red-500 hover:text-red-400 cursor-pointer"
                         >
                           <Youtube className="h-5 w-5" />
-                        </a>
+                        </span>
                       )}
                       <Badge variant={config.variant} className="gap-1">
                         <StatusIcon className={`h-3 w-3 ${isProcessing ? "animate-spin" : ""}`} />
