@@ -1,6 +1,7 @@
 """
 YouTubeUploader Node - Uploads video to YouTube.
 """
+
 from typing import Dict, Any
 from pathlib import Path
 
@@ -19,19 +20,19 @@ logger = get_logger(__name__)
 async def youtube_uploader_node(state: GraphState) -> GraphState:
     """
     Upload the completed video to YouTube.
-    
+
     Steps:
     1. Fetch user's YouTube connection
     2. Refresh token if expired
     3. Upload video with metadata
     4. Save video ID to project
-    
+
     Updates:
     - youtube_video_id: The uploaded video's YouTube ID
     - progress: Updated to 1.0 on success
     """
     logger.info("YouTubeUploader node started", project_id=state["project_id"])
-    
+
     state["current_step"] = "uploading_youtube"
 
     try:
@@ -41,7 +42,7 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
             # Get YouTube connection for this user
             stmt = select(YouTubeConnection).where(
                 YouTubeConnection.user_id == state["user_id"],
-                YouTubeConnection.is_active == True
+                YouTubeConnection.is_active == True,
             )
             result = await session.execute(stmt)
             connection = result.scalar_one_or_none()
@@ -60,14 +61,17 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
                 new_tokens = await youtube_service.refresh_token(refresh_token)
 
                 # Update connection with new token
-                connection.access_token = encryption_service.encrypt(new_tokens["token"])
+                connection.access_token = encryption_service.encrypt(
+                    new_tokens["token"]
+                )
                 connection.token_expires_at = new_tokens["expiry"]
                 session.add(connection)
-                
+
                 access_token = new_tokens["token"]
-            
+
             # Update project status
             from uuid import UUID as UUIDType
+
             project = await session.get(Project, UUIDType(state["project_id"]))
             if project:
                 project.status = ProjectStatus.UPLOADING_YOUTUBE
@@ -84,7 +88,8 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
             video_id = await youtube_service.upload_video(
                 access_token=access_token,
                 file_path=video_full_path,
-                metadata=metadata
+                metadata=metadata,
+                refresh_token=refresh_token,
             )
 
             # Update project with YouTube info
@@ -97,13 +102,13 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
 
             state["youtube_video_id"] = video_id
             state["progress"] = 1.0
-            
+
             logger.info(
                 "YouTube upload completed",
                 project_id=state["project_id"],
-                video_id=video_id
+                video_id=video_id,
             )
-        
+
     except Exception as e:
         error_msg = f"YouTube upload failed: {str(e)}"
         logger.error(error_msg, project_id=state["project_id"])
@@ -123,10 +128,13 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
                     session.add(connection)
 
                 from uuid import UUID as UUIDType
+
                 project = await session.get(Project, UUIDType(state["project_id"]))
                 if project:
                     project.status = ProjectStatus.COMPLETED  # Revert to completed
-                    project.error_message = "YouTube connection expired. Please reconnect."
+                    project.error_message = (
+                        "YouTube connection expired. Please reconnect."
+                    )
                     session.add(project)
 
                 await session.commit()
@@ -135,10 +143,13 @@ async def youtube_uploader_node(state: GraphState) -> GraphState:
             # Quota exceeded - mark for retry tomorrow
             async with get_session_context() as session:
                 from uuid import UUID as UUIDType
+
                 project = await session.get(Project, UUIDType(state["project_id"]))
                 if project:
                     project.status = ProjectStatus.COMPLETED
-                    project.error_message = "YouTube quota exceeded. Will retry tomorrow."
+                    project.error_message = (
+                        "YouTube quota exceeded. Will retry tomorrow."
+                    )
                     session.add(project)
                     await session.commit()
 

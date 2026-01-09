@@ -143,13 +143,28 @@ class YouTubeService:
             raise
 
     async def upload_video(
-        self, access_token: str, file_path: str, metadata: Dict[str, Any]
+        self,
+        access_token: str,
+        file_path: str,
+        metadata: Dict[str, Any],
+        refresh_token: str = None,
     ) -> str:
         """
         Upload video to YouTube.
         Return video ID if successful.
         """
-        credentials = google.oauth2.credentials.Credentials(token=access_token)
+        # Build credentials with refresh capability if refresh_token provided
+        if refresh_token:
+            credentials = google.oauth2.credentials.Credentials(
+                token=access_token,
+                refresh_token=refresh_token,
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=settings.google_client_id,
+                client_secret=settings.google_client_secret,
+            )
+        else:
+            credentials = google.oauth2.credentials.Credentials(token=access_token)
+
         youtube = build("youtube", "v3", credentials=credentials)
 
         body = metadata
