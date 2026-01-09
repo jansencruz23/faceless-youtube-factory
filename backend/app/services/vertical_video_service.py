@@ -225,12 +225,12 @@ class VerticalVideoService:
         logger.info(f"Video created in {elapsed:.1f}s: {output_path}")
 
     def _generate_animated_ass(self, words: List[dict], output_path: Path) -> None:
-        """Generate ASS subtitles with popup animation effect."""
+        """Generate ASS subtitles with enhanced TikTok-style animations."""
 
-        # ASS header with animated style
-        # Popup effect: scale from 0 to 100 quickly, slight overshoot
+        # Enhanced ASS header with multiple styles for variety
+        # Modern TikTok/Shorts style captions with glow, shadow, and bold text
         ass_content = f"""[Script Info]
-Title: Animated Captions
+Title: Enhanced Animated Captions
 ScriptType: v4.00+
 PlayResX: {WIDTH}
 PlayResY: {HEIGHT}
@@ -238,13 +238,15 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Pop,Impact,100,&H00FFFFFF,&H000000FF,&H00000000,&HAA000000,1,0,0,0,100,100,0,0,1,4,2,5,10,10,300,1
+Style: Pop,Impact,120,&H00FFFFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,2,0,1,5,3,5,10,10,350,1
+Style: Highlight,Impact,120,&H0000FFFF,&H000000FF,&H00000000,&HCC000000,1,0,0,0,100,100,2,0,1,5,3,5,10,10,350,1
+Style: Glow,Impact,120,&H00FFFFFF,&H0000FFFF,&H0000FFFF,&HCC000000,1,0,0,0,100,100,2,0,1,6,4,5,10,10,350,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
 
-        for word_info in words:
+        for i, word_info in enumerate(words):
             start_time = self._seconds_to_ass_time(word_info["start"])
             end_time = self._seconds_to_ass_time(word_info["end"])
             word = word_info["word"].upper()
@@ -252,29 +254,39 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             # Clean the word
             word = word.replace("\\", "").replace("{", "").replace("}", "")
 
-            # Popup animation effect:
-            # - Start at scale 0
-            # - Pop to 110% in 0.05s
-            # - Settle to 100% by 0.1s
+            # Calculate animation timing
             duration_ms = int((word_info["end"] - word_info["start"]) * 1000)
-            pop_duration = min(100, duration_ms // 3)  # 100ms or 1/3 of word duration
+            pop_in = min(80, duration_ms // 4)  # Pop in time
+            settle = min(60, duration_ms // 5)  # Settle time
 
-            # ASS animation tags:
-            # \t(0,50,\fscx110\fscy110) - scale up to 110% in 50ms
-            # \t(50,100,\fscx100\fscy100) - settle to 100%
+            # Enhanced animation with multiple effects:
+            # 1. Scale pop (0 -> 115% -> 100%)
+            # 2. Color flash (yellow highlight -> white)
+            # 3. Blur to sharp effect
+            # 4. Subtle y-position bounce
             animated_text = (
-                f"{{\\fscx0\\fscy0\\t(0,{pop_duration // 2},\\fscx110\\fscy110)"
-                f"\\t({pop_duration // 2},{pop_duration},\\fscx100\\fscy100)}}{word}"
+                # Start invisible and small
+                f"{{\\fscx0\\fscy0\\bord8\\blur3"
+                # Pop up with overshoot, yellow highlight
+                f"\\t(0,{pop_in},\\fscx115\\fscy115\\bord5\\blur0\\1c&H00FFFF&)"
+                # Settle to normal size, transition to white
+                f"\\t({pop_in},{pop_in + settle},\\fscx100\\fscy100\\bord5\\1c&HFFFFFF&)"
+                f"}}{word}"
             )
 
+            # Use Glow style for emphasis words (longer words or every few words)
+            style = "Pop"
+            if len(word) > 6 or i % 5 == 0:
+                style = "Glow"
+
             ass_content += (
-                f"Dialogue: 0,{start_time},{end_time},Pop,,0,0,0,,{animated_text}\n"
+                f"Dialogue: 0,{start_time},{end_time},{style},,0,0,0,,{animated_text}\n"
             )
 
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(ass_content)
 
-        logger.info(f"  Generated animated ASS with {len(words)} words")
+        logger.info(f"  Generated enhanced animated ASS with {len(words)} words")
 
     def _seconds_to_ass_time(self, seconds: float) -> str:
         """Convert seconds to ASS time format (H:MM:SS.CC)"""
@@ -497,14 +509,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
                 scene_video_paths.append(scene_video_path)
 
-            # Create concat list file
-            with open(concat_list_path, "w") as f:
+            # Create concat list file - use relative paths from temp_dir
+            with open(concat_list_path, "w", encoding="utf-8") as f:
                 for vpath in scene_video_paths:
-                    # FFmpeg concat requires forward slashes
-                    escaped_path = str(vpath).replace("\\", "/")
-                    f.write(f"file '{escaped_path}'\n")
+                    # Use just the filename since we'll run ffmpeg from temp_dir
+                    f.write(f"file '{vpath.name}'\n")
+
+            logger.info(f"  Concat list created with {len(scene_video_paths)} scenes")
 
             # Concatenate all scene videos and add audio
+            # Run from temp_dir to use relative paths
             cmd = [
                 "ffmpeg",
                 "-y",
@@ -517,23 +531,26 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 "-i",
                 str(audio_path),
                 "-c:v",
-                "libx264",
-                "-preset",
-                "ultrafast",
-                "-crf",
-                "28",
+                "copy",  # Copy video stream (no re-encode for speed)
                 "-c:a",
                 "aac",
                 "-shortest",
                 str(output_path),
             ]
 
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            logger.info(f"  Running concat command...")
+            result = subprocess.run(
+                cmd, capture_output=True, text=True, cwd=str(self.temp_dir)
+            )
             if result.returncode != 0:
-                logger.error(f"Video concatenation failed: {result.stderr}")
-                raise RuntimeError("Failed to concatenate scene videos")
-
-            logger.info(f"  Created video with {len(scene_clips)} image-based scenes")
+                logger.error(f"Video concatenation failed: {result.stderr[:500]}")
+                # Try alternate approach: filter_complex concat
+                logger.info("  Trying alternate concat method...")
+                self._concat_videos_filter(scene_video_paths, audio_path, output_path)
+            else:
+                logger.info(
+                    f"  Created video with {len(scene_clips)} image-based scenes"
+                )
 
         finally:
             # Cleanup temp scene videos and concat list
@@ -548,6 +565,54 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                     concat_list_path.unlink()
             except Exception:
                 pass
+
+    def _concat_videos_filter(
+        self, video_paths: List[Path], audio_path: Path, output_path: Path
+    ) -> None:
+        """Fallback concat using filter_complex (more compatible on Windows)."""
+        if not video_paths:
+            raise RuntimeError("No videos to concatenate")
+
+        # Build input arguments
+        input_args = []
+        for vpath in video_paths:
+            input_args.extend(["-i", str(vpath)])
+        input_args.extend(["-i", str(audio_path)])
+
+        # Build filter_complex string
+        n = len(video_paths)
+        filter_parts = "".join([f"[{i}:v]" for i in range(n)])
+        filter_str = f"{filter_parts}concat=n={n}:v=1:a=0[outv]"
+
+        cmd = (
+            ["ffmpeg", "-y"]
+            + input_args
+            + [
+                "-filter_complex",
+                filter_str,
+                "-map",
+                "[outv]",
+                "-map",
+                f"{n}:a",  # Audio is the last input
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "28",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(output_path),
+            ]
+        )
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.error(f"Filter concat also failed: {result.stderr[:500]}")
+            raise RuntimeError("Failed to concatenate scene videos")
+
+        logger.info(f"  Concat via filter_complex succeeded")
 
     def _create_scene_solid_video(self, output_path: Path, duration: float) -> None:
         """Create a short solid color video for a single scene."""

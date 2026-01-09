@@ -391,6 +391,29 @@ export default function NewProjectPage() {
                                     </div>
                                 </div>
 
+                                {/* Image Ratio for Per Scene mode */}
+                                {backgroundMode === "per_scene" && (
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Scenes per Image</label>
+                                        <p className="text-xs text-muted-foreground">How many scenes share the same AI image</p>
+                                        <div className="flex gap-2">
+                                            {ratioOptions.map((option) => (
+                                                <button
+                                                    key={option.value}
+                                                    type="button"
+                                                    onClick={() => setScenesPerImage(option.value)}
+                                                    className={`flex-1 p-2 rounded-lg border transition-colors ${scenesPerImage === option.value
+                                                        ? "border-primary bg-primary/10"
+                                                        : "border-border hover:border-primary/50"
+                                                        }`}
+                                                >
+                                                    {option.label}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Preset Videos Selector */}
                                 {backgroundMode === "preset" && (
                                     <div className="space-y-2">

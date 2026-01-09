@@ -21,12 +21,14 @@ def get_whisper_model():
     if _whisper_model is None:
         try:
             from faster_whisper import WhisperModel
+            import os
 
-            # Use 'tiny' model for speed, 'base' for better accuracy
-            # Model will be downloaded on first use (~75MB for tiny)
-            logger.info("Loading Whisper model (tiny, CPU mode)...")
+            # Use 'small' for better multilingual accuracy (Filipino, etc.)
+            # Can be overridden via WHISPER_MODEL env var
+            model_size = os.environ.get("WHISPER_MODEL", "small")
+            logger.info(f"Loading Whisper model ({model_size}, CPU mode)...")
             _whisper_model = WhisperModel(
-                "tiny",  # Use tiny for faster CPU inference
+                model_size,  # 'small' is better for non-English
                 device="cpu",  # Use CPU to avoid CUDA issues
                 compute_type="int8",  # Faster inference on CPU
             )
@@ -52,8 +54,11 @@ def transcribe_audio_with_timestamps(audio_path: Path) -> List[Dict]:
         segments, info = model.transcribe(
             str(audio_path),
             word_timestamps=True,  # Enable word-level timestamps
-            language="en",  # Set language for faster inference
+            language=None,  # Auto-detect language (supports Filipino/Tagalog)
         )
+
+        detected_lang = info.language if hasattr(info, "language") else "unknown"
+        logger.info(f"  Detected language: {detected_lang}")
 
         words = []
         for segment in segments:
