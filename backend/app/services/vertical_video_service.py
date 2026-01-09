@@ -447,19 +447,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 scene_video_path = self.temp_dir / f"scene_{i}.mp4"
 
                 if img_path and img_path.exists():
-                    # Create video from image with subtle Ken Burns effect
-                    # Just slow zoom, no pan to avoid bouncing
+                    # Create video from image with simple slow zoom
                     total_frames = int(duration * 24)
 
-                    # Random zoom: either zoom in or zoom out slightly
-                    zoom_in = random.choice([True, False])
-                    if zoom_in:
-                        # Zoom in: 1.0 -> 1.1
-                        zoom_expr = f"zoom=min(1.0+on/{total_frames}*0.1,1.1)"
-                    else:
-                        # Zoom out: 1.1 -> 1.0
-                        zoom_expr = f"zoom=max(1.1-on/{total_frames}*0.1,1.0)"
-
+                    # Simple slow zoom - very compatible expression
+                    # Zoom from 1.0 to about 1.08 over the duration
                     cmd = [
                         "ffmpeg",
                         "-y",
@@ -467,10 +459,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                         "1",
                         "-i",
                         str(img_path),
-                        "-filter_complex",
-                        f"[0:v]scale=4000:-1,zoompan={zoom_expr}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s={WIDTH}x{HEIGHT}:fps=24[v]",
-                        "-map",
-                        "[v]",
+                        "-vf",
+                        f"scale=-1:2160,crop=1080:1920,zoompan=z='1+0.0003*on':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d={total_frames}:s={WIDTH}x{HEIGHT}:fps=24",
                         "-c:v",
                         "libx264",
                         "-preset",
