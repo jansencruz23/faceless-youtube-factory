@@ -12,7 +12,7 @@ import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Sm
 
 type ImageMode = "per_scene" | "single" | "upload" | "none";
 type VideoFormat = "horizontal" | "vertical";
-type BackgroundMode = "preset" | "upload" | "image" | "none";
+type BackgroundMode = "preset" | "upload" | "image" | "per_scene" | "none";
 
 export default function NewProjectPage() {
     const router = useRouter();
@@ -134,6 +134,8 @@ export default function NewProjectPage() {
             } else if (backgroundMode === "upload" && uploadedVideoUrl) {
                 backgroundVideoUrl = uploadedVideoUrl;
                 finalImageMode = "none"; // Skip image generation when using video
+            } else if (backgroundMode === "per_scene") {
+                finalImageMode = "per_scene"; // Generate AI image per scene
             } else if (backgroundMode === "image") {
                 finalImageMode = "single";
             } else {
@@ -177,7 +179,8 @@ export default function NewProjectPage() {
     const backgroundModeOptions = [
         { value: "preset" as BackgroundMode, label: "Preset Videos", description: "Choose from library" },
         { value: "upload" as BackgroundMode, label: "Upload Video", description: "Your video" },
-        { value: "image" as BackgroundMode, label: "AI Image", description: "Generate one image" },
+        { value: "per_scene" as BackgroundMode, label: "AI Per Scene", description: "Multiple AI images" },
+        { value: "image" as BackgroundMode, label: "AI Single", description: "One AI image" },
         { value: "none" as BackgroundMode, label: "None", description: "Solid color" },
     ];
 

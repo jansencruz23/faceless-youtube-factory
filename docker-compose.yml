@@ -107,16 +107,16 @@ services:
       - N8N_PROTOCOL=http
       - WEBHOOK_URL=http://localhost:5678/
       - GENERIC_TIMEZONE=Asia/Manila
+      # IMPORTANT: Set a fixed encryption key to persist credentials
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY:-your-32-char-encryption-key-here}
     volumes:
       - ./n8n_data:/home/node/.n8n
     ports:
       - "5678:5678"
     depends_on:
       - backend
+    user: "root" # Helps with Windows file permission issues
 
 volumes:
   postgres_data:
   huggingface_cache:
-  n8n_data:
-
-

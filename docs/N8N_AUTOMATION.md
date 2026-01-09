@@ -73,12 +73,14 @@ You can use n8n's AI nodes or Groq directly to generate topics:
 | Field | Options | Description |
 |-------|---------|-------------|
 | `video_format` | `"vertical"`, `"horizontal"` | Video orientation |
-| `background_video` | `"preset:minecraft"`, `"preset:subway"`, `null`, URL | For vertical videos |
+| `background_video` | `"preset:minecraft"`, `"preset:subway"`, `null`, URL | For vertical videos (ignored if using image_mode) |
 | `background_music` | `"preset:lofi"`, `"preset:energetic"`, `null`, URL | Background music |
 | `music_volume` | `0.0` to `1.0` | Music volume level |
-| `image_mode` | `"none"`, `"per_scene"`, `"shared"` | Image generation mode |
-| `enable_captions` | `true`, `false` | Show captions |
+| `image_mode` | `"none"`, `"per_scene"`, `"single"` | Background mode. For vertical: `per_scene` generates AI image per scene with Ken Burns effect, `single` = one AI image, `none` = solid color or use `background_video` |
+| `enable_captions` | `true`, `false` | Show word-by-word captions |
 | `auto_upload` | `true`, `false` | Auto-upload to YouTube |
+
+> **Tip**: For vertical videos with AI-generated backgrounds, set `image_mode: "per_scene"` and omit `background_video`. Each scene will get a unique AI-generated image with a subtle zoom effect.
 
 ### Step 4: Check Status (Optional)
 

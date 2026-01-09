@@ -64,6 +64,11 @@ class VerticalVideoService:
                 else None
             )
 
+            # Process image paths if provided
+            image_paths = None
+            if image_files:
+                image_paths = [self.static_base / p for p in image_files]
+
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(
                 vertical_video_executor,
@@ -76,6 +81,8 @@ class VerticalVideoService:
                 bg_music_path,
                 music_volume,
                 enable_captions,
+                image_paths,
+                image_scene_indices,
             )
 
             relative_path = output_path.relative_to(self.static_base)
@@ -97,6 +104,8 @@ class VerticalVideoService:
         bg_music_path: Optional[Path],
         music_volume: float,
         enable_captions: bool,
+        image_paths: Optional[List[Path]] = None,
+        image_scene_indices: Optional[List[int]] = None,
     ) -> None:
         """Compose video with Whisper transcription for accurate captions."""
         start_time = time.time()
@@ -136,7 +145,32 @@ class VerticalVideoService:
         logger.info("[3/5] Creating base video...")
         temp_video_path = self.temp_dir / f"{project_id}_temp.mp4"
 
-        if bg_video_path and bg_video_path.exists():
+        # Get individual audio durations for scene-based images
+        scene_durations = []
+        for audio_path in valid_audio_paths:
+            try:
+                clip = AudioFileClip(str(audio_path))
+                scene_durations.append(clip.duration)
+                clip.close()
+            except Exception:
+                scene_durations.append(3.0)  # Default fallback
+
+        # Priority: Images > Background Video > Solid Color
+        valid_images = []
+        if image_paths:
+            valid_images = [p for p in image_paths if p and p.exists()]
+
+        if valid_images and image_scene_indices:
+            logger.info(f"  Using {len(valid_images)} scene-based images")
+            self._create_video_with_images_ffmpeg(
+                valid_images,
+                image_scene_indices,
+                scene_durations,
+                merged_audio_path,
+                temp_video_path,
+                total_duration,
+            )
+        elif bg_video_path and bg_video_path.exists():
             self._create_video_with_bg_ffmpeg(
                 bg_video_path, merged_audio_path, temp_video_path, total_duration
             )
@@ -373,6 +407,170 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if result.returncode != 0:
             logger.error(f"Video creation failed: {result.stderr}")
             raise RuntimeError("Failed to create video with background")
+
+    def _create_video_with_images_ffmpeg(
+        self,
+        image_paths: List[Path],
+        image_scene_indices: List[int],
+        scene_durations: List[float],
+        audio_path: Path,
+        output_path: Path,
+        total_duration: float,
+    ) -> None:
+        """Create video from scene-based images with Ken Burns effect."""
+        import random
+
+        # Build list of (image_path, duration) for each scene
+        scene_clips = []
+        for i, duration in enumerate(scene_durations):
+            if i < len(image_scene_indices):
+                img_idx = image_scene_indices[i]
+                if img_idx >= 0 and img_idx < len(image_paths):
+                    scene_clips.append((image_paths[img_idx], duration))
+                else:
+                    scene_clips.append((None, duration))
+            else:
+                scene_clips.append((None, duration))
+
+        if not scene_clips:
+            # Fallback to solid color
+            self._create_solid_video_ffmpeg(audio_path, output_path, total_duration)
+            return
+
+        # Create individual scene videos and concatenate
+        scene_video_paths = []
+        concat_list_path = self.temp_dir / "concat_list.txt"
+
+        try:
+            for i, (img_path, duration) in enumerate(scene_clips):
+                scene_video_path = self.temp_dir / f"scene_{i}.mp4"
+
+                if img_path and img_path.exists():
+                    # Create video from image with Ken Burns effect
+                    # Random zoom direction
+                    zoom_start = random.uniform(1.0, 1.05)
+                    zoom_end = random.uniform(1.05, 1.15)
+                    if random.choice([True, False]):
+                        zoom_start, zoom_end = zoom_end, zoom_start
+
+                    # Zoom expression: interpolate from zoom_start to zoom_end over duration
+                    zoom_expr = f"zoom='if(lte(zoom,1.0),{zoom_start},min(zoom+{(zoom_end - zoom_start) / duration / 24:.8f},{zoom_end}))'"
+
+                    # Pan expression for subtle movement
+                    pan_x = random.uniform(-0.02, 0.02)
+                    pan_y = random.uniform(-0.02, 0.02)
+
+                    cmd = [
+                        "ffmpeg",
+                        "-y",
+                        "-loop",
+                        "1",
+                        "-i",
+                        str(img_path),
+                        "-filter_complex",
+                        f"[0:v]scale=8000:-1,zoompan={zoom_expr}:x='iw/2-(iw/zoom/2)+({pan_x}*on)':y='ih/2-(ih/zoom/2)+({pan_y}*on)':d={int(duration * 24)}:s={WIDTH}x{HEIGHT}:fps=24[v]",
+                        "-map",
+                        "[v]",
+                        "-c:v",
+                        "libx264",
+                        "-preset",
+                        "ultrafast",
+                        "-crf",
+                        "28",
+                        "-t",
+                        str(duration),
+                        "-pix_fmt",
+                        "yuv420p",
+                        str(scene_video_path),
+                    ]
+
+                    result = subprocess.run(cmd, capture_output=True, text=True)
+                    if result.returncode != 0:
+                        logger.warning(
+                            f"Scene {i} image video failed, using solid color: {result.stderr[:200]}"
+                        )
+                        # Fallback to solid color for this scene
+                        self._create_scene_solid_video(scene_video_path, duration)
+                else:
+                    # No image - create solid color scene
+                    self._create_scene_solid_video(scene_video_path, duration)
+
+                scene_video_paths.append(scene_video_path)
+
+            # Create concat list file
+            with open(concat_list_path, "w") as f:
+                for vpath in scene_video_paths:
+                    # FFmpeg concat requires forward slashes
+                    escaped_path = str(vpath).replace("\\", "/")
+                    f.write(f"file '{escaped_path}'\n")
+
+            # Concatenate all scene videos and add audio
+            cmd = [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "concat",
+                "-safe",
+                "0",
+                "-i",
+                str(concat_list_path),
+                "-i",
+                str(audio_path),
+                "-c:v",
+                "libx264",
+                "-preset",
+                "ultrafast",
+                "-crf",
+                "28",
+                "-c:a",
+                "aac",
+                "-shortest",
+                str(output_path),
+            ]
+
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                logger.error(f"Video concatenation failed: {result.stderr}")
+                raise RuntimeError("Failed to concatenate scene videos")
+
+            logger.info(f"  Created video with {len(scene_clips)} image-based scenes")
+
+        finally:
+            # Cleanup temp scene videos and concat list
+            for vpath in scene_video_paths:
+                try:
+                    if vpath.exists():
+                        vpath.unlink()
+                except Exception:
+                    pass
+            try:
+                if concat_list_path.exists():
+                    concat_list_path.unlink()
+            except Exception:
+                pass
+
+    def _create_scene_solid_video(self, output_path: Path, duration: float) -> None:
+        """Create a short solid color video for a single scene."""
+        cmd = [
+            "ffmpeg",
+            "-y",
+            "-f",
+            "lavfi",
+            "-i",
+            f"color=c=0x0f0f19:s={WIDTH}x{HEIGHT}:d={duration}:r=24",
+            "-c:v",
+            "libx264",
+            "-preset",
+            "ultrafast",
+            "-crf",
+            "28",
+            "-pix_fmt",
+            "yuv420p",
+            str(output_path),
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode != 0:
+            logger.warning(f"Scene solid video failed: {result.stderr[:200]}")
 
     def _burn_subtitles_ffmpeg(
         self, input_path: Path, ass_path: Path, output_path: Path
