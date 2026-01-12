@@ -434,6 +434,29 @@ async def update_project(
             "script_prompt", ""
         )
         if prompt:
+            # Clean up old data before regeneration
+            from app.models import Script, Cast, Asset
+            from sqlmodel import delete
+            import shutil
+            from pathlib import Path
+
+            # Delete old scripts, casts, and assets from database
+            await session.execute(delete(Asset).where(Asset.project_id == project_id))
+            await session.execute(delete(Cast).where(Cast.project_id == project_id))
+            await session.execute(delete(Script).where(Script.project_id == project_id))
+            await session.commit()
+
+            # Delete generated files from filesystem
+            static_dir = Path(settings.static_dir)
+            for folder in ["audio", "video", "images"]:
+                folder_path = static_dir / folder / str(project_id)
+                if folder_path.exists():
+                    shutil.rmtree(folder_path, ignore_errors=True)
+
+            logger.info(
+                "Cleaned up old data for regeneration", project_id=str(project_id)
+            )
+
             # Update status to generating
             await project_crud.update_status(
                 session=session,
