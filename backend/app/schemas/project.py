@@ -10,6 +10,9 @@ class ProjectCreateRequest(BaseModel):
     """Request body for creating a new project."""
 
     title: str = Field(..., max_length=255, min_length=1)
+    category: Optional[str] = Field(
+        None, max_length=100, description="Project category for organization"
+    )
     script_prompt: str = Field(..., max_length=5000, min_length=10)
     auto_upload: bool = False
 

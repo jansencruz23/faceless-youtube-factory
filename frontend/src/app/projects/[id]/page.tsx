@@ -24,6 +24,7 @@ import {
     CheckCircle2,
     XCircle,
     Trash2,
+    Folder,
 } from "lucide-react";
 
 const statusConfig: Record<
@@ -164,9 +165,17 @@ export default function ProjectDetailPage() {
             <div className="flex items-start justify-between">
                 <div>
                     <h1 className="text-3xl font-bold">{project.title}</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Created {new Date(project.created_at).toLocaleDateString()}
-                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                        <p className="text-muted-foreground">
+                            Created {new Date(project.created_at).toLocaleDateString()}
+                        </p>
+                        {project.category && (
+                            <Badge variant="outline" className="text-xs">
+                                <Folder className="h-3 w-3 mr-1" />
+                                {project.category}
+                            </Badge>
+                        )}
+                    </div>
                 </div>
                 <div className="flex items-center gap-3">
                     {/* Cancel Button - Show during processing */}

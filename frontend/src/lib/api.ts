@@ -75,6 +75,7 @@ async function uploadFile(
 
 export async function createProject(data: {
     title: string;
+    category?: string;
     script_prompt: string;
     auto_upload: boolean;
     video_format?: "horizontal" | "vertical";

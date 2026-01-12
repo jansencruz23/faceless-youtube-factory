@@ -138,7 +138,11 @@ async def create_project(
         "enable_captions": request.enable_captions,
     }
     project = await project_crud.create(
-        session=session, user_id=user_id, title=request.title, settings=settings
+        session=session,
+        user_id=user_id,
+        title=request.title,
+        category=request.category,
+        settings=settings,
     )
 
     # Update status to generating
@@ -168,6 +172,7 @@ async def create_project(
     return ProjectResponse(
         id=project.id,
         title=project.title,
+        category=project.category,
         status=project.status.value,
         youtube_video_id=project.youtube_video_id,
         youtube_url=project.youtube_url,

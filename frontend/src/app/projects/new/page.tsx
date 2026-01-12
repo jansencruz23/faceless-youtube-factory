@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Smartphone } from "lucide-react";
+import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Smartphone, Folder } from "lucide-react";
 
 type ImageMode = "per_scene" | "single" | "upload" | "none";
 type VideoFormat = "horizontal" | "vertical";
@@ -22,6 +22,7 @@ export default function NewProjectPage() {
     const musicInputRef = useRef<HTMLInputElement>(null);
 
     const [title, setTitle] = useState("");
+    const [category, setCategory] = useState("");
     const [prompt, setPrompt] = useState("");
     const [autoUpload, setAutoUpload] = useState(false);
 
@@ -59,6 +60,17 @@ export default function NewProjectPage() {
         queryKey: ["preset-music"],
         queryFn: () => api.getPresetMusic(),
     });
+
+    // Fetch all projects to get existing categories for suggestions
+    const { data: projectsData } = useQuery({
+        queryKey: ["projects-all"],
+        queryFn: () => api.listProjects(1, 100),
+    });
+
+    // Extract unique categories from existing projects
+    const existingCategories = projectsData?.items
+        ? [...new Set(projectsData.items.map(p => p.category).filter(Boolean) as string[])]
+        : [];
 
     const createMutation = useMutation({
         mutationFn: api.createProject,
@@ -150,6 +162,7 @@ export default function NewProjectPage() {
 
         createMutation.mutate({
             title,
+            category: category.trim() || undefined,
             script_prompt: prompt,
             auto_upload: autoUpload,
             video_format: videoFormat,
@@ -215,6 +228,31 @@ export default function NewProjectPage() {
                                 required
                                 maxLength={255}
                             />
+                        </div>
+
+                        {/* Category */}
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <Folder className="h-4 w-4" />
+                                Category (Optional)
+                            </label>
+                            <Input
+                                list="category-suggestions"
+                                placeholder="e.g., Tech Videos, Gaming, Tutorials"
+                                value={category}
+                                onChange={(e) => setCategory(e.target.value)}
+                                maxLength={100}
+                            />
+                            {existingCategories.length > 0 && (
+                                <datalist id="category-suggestions">
+                                    {existingCategories.map((cat) => (
+                                        <option key={cat} value={cat} />
+                                    ))}
+                                </datalist>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                Organize your projects by category. Select existing or type a new one.
+                            </p>
                         </div>
 
                         {/* Prompt */}
