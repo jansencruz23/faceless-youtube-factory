@@ -421,7 +421,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         total_duration: float,
     ) -> None:
         """Create video from scene-based images with smooth Ken Burns effect."""
-        import random
 
         # Build list of (image_path, duration) for each scene
         scene_clips = []
@@ -449,50 +448,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 scene_video_path = self.temp_dir / f"scene_{i}.mp4"
 
                 if img_path and img_path.exists():
-                    # Create video from image with smooth Ken Burns effect
-                    # Use 30fps for smoother animation
+                    # Create video from image with ultra-smooth Ken Burns effect
+                    # Use higher fps for buttery smooth animation
                     fps = 30
                     total_frames = int(duration * fps)
 
-                    # Randomize zoom direction (in or out)
-                    zoom_in = random.choice([True, False])
+                    # Ultra-smooth linear zoom - very subtle (5% total)
+                    # Simple linear progression: zoom = 1.0 + (0.05 * frame / total_frames)
+                    zoom_expr = f"1.0+0.05*on/{total_frames}"
 
-                    # Randomize pan direction for variety
-                    pan_direction = random.choice(
-                        ["left", "right", "up", "down", "center"]
+                    # Consistent slow pan to the LEFT (one direction only)
+                    # Pan 30 pixels total over the duration for subtle movement
+                    pan_pixels = 30
+                    x_expr = (
+                        f"iw/2-(iw/zoom/2)+{pan_pixels}-{pan_pixels}*on/{total_frames}"
                     )
-
-                    # Smooth ease-in-out zoom using sine function
-                    # This creates natural acceleration/deceleration
-                    # Formula: zoom = 1.0 + 0.12 * (1 - cos(pi * progress)) / 2
-                    # This eases from 1.0 to 1.12 (12% zoom) smoothly
-                    if zoom_in:
-                        # Ease-in-out zoom from 1.0 to 1.12
-                        zoom_expr = f"1.0+0.12*(1-cos(PI*on/{total_frames}))/2"
-                    else:
-                        # Ease-in-out zoom from 1.12 to 1.0 (zoom out)
-                        zoom_expr = f"1.12-0.12*(1-cos(PI*on/{total_frames}))/2"
-
-                    # Pan expressions with easing - subtle movement across the image
-                    # Using sine-based easing for smooth start/stop
-                    pan_amount = 50  # pixels to pan
-                    progress_expr = f"(1-cos(PI*on/{total_frames}))/2"
-
-                    if pan_direction == "left":
-                        x_expr = f"iw/2-(iw/zoom/2)+{pan_amount}*(1-{progress_expr})"
-                        y_expr = "ih/2-(ih/zoom/2)"
-                    elif pan_direction == "right":
-                        x_expr = f"iw/2-(iw/zoom/2)-{pan_amount}+{pan_amount}*{progress_expr}"
-                        y_expr = "ih/2-(ih/zoom/2)"
-                    elif pan_direction == "up":
-                        x_expr = "iw/2-(iw/zoom/2)"
-                        y_expr = f"ih/2-(ih/zoom/2)+{pan_amount}*(1-{progress_expr})"
-                    elif pan_direction == "down":
-                        x_expr = "iw/2-(iw/zoom/2)"
-                        y_expr = f"ih/2-(ih/zoom/2)-{pan_amount}+{pan_amount}*{progress_expr}"
-                    else:  # center - no pan, just zoom
-                        x_expr = "iw/2-(iw/zoom/2)"
-                        y_expr = "ih/2-(ih/zoom/2)"
+                    y_expr = "ih/2-(ih/zoom/2)"
 
                     cmd = [
                         "ffmpeg",

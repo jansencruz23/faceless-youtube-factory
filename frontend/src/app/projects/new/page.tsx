@@ -237,21 +237,34 @@ export default function NewProjectPage() {
                                 Category (Optional)
                             </label>
                             <Input
-                                list="category-suggestions"
                                 placeholder="e.g., Tech Videos, Gaming, Tutorials"
                                 value={category}
                                 onChange={(e) => setCategory(e.target.value)}
                                 maxLength={100}
                             />
+                            {/* Existing categories as badges */}
                             {existingCategories.length > 0 && (
-                                <datalist id="category-suggestions">
+                                <div className="flex flex-wrap gap-2">
                                     {existingCategories.map((cat) => (
-                                        <option key={cat} value={cat} />
+                                        <button
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setCategory(category === cat ? "" : cat)}
+                                            className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${category === cat
+                                                    ? "bg-primary text-primary-foreground"
+                                                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                                }`}
+                                        >
+                                            {cat}
+                                            {category === cat && (
+                                                <X className="h-3 w-3" />
+                                            )}
+                                        </button>
                                     ))}
-                                </datalist>
+                                </div>
                             )}
                             <p className="text-xs text-muted-foreground">
-                                Organize your projects by category. Select existing or type a new one.
+                                Click a category to select it, or type a new one.
                             </p>
                         </div>
 
