@@ -27,11 +27,17 @@ class ImageService:
         self._model_loaded = False
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        # Log GPU status on initialization
+        # Limit GPU memory to 80% to avoid maxing out VRAM
         if torch.cuda.is_available():
+            # Set memory fraction limit (0.8 = 80%)
+            torch.cuda.set_per_process_memory_fraction(0.8, device=0)
+
             gpu_name = torch.cuda.get_device_name(0)
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / (1024**3)
-            logger.info(f"GPU available: {gpu_name} ({gpu_memory:.1f} GB VRAM)")
+            usable_memory = gpu_memory * 0.8
+            logger.info(
+                f"GPU available: {gpu_name} ({gpu_memory:.1f} GB VRAM, limited to {usable_memory:.1f} GB)"
+            )
         else:
             logger.warning(
                 "No GPU available! Image generation will be VERY slow on CPU."
@@ -69,9 +75,13 @@ class ImageService:
                     f"Model downloaded/loaded from cache in {download_time:.1f}s"
                 )
 
-                logger.info("Moving model to GPU...")
+                logger.info("Moving model to GPU with memory optimizations...")
                 self.pipe = self.pipe.to("cuda")
+
+                # Enable memory-efficient attention and VAE optimizations
                 self.pipe.enable_attention_slicing()
+                self.pipe.enable_vae_slicing()
+                self.pipe.enable_vae_tiling()
 
                 # Log VRAM usage after loading
                 allocated = torch.cuda.memory_allocated(0) / (1024**3)
