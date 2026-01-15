@@ -6,6 +6,14 @@ from uuid import UUID
 from pydantic import BaseModel, Field
 
 
+class VoicePreference(BaseModel):
+    """User-specified voice settings for single-narrator projects."""
+
+    voice_id: str = Field(..., description="Edge-TTS voice ID (e.g., en-US-GuyNeural)")
+    pitch: str = Field(default="+0Hz", description="Pitch adjustment (-10Hz to +10Hz)")
+    rate: str = Field(default="+0%", description="Rate adjustment (-20% to +30%)")
+
+
 class ProjectCreateRequest(BaseModel):
     """Request body for creating a new project."""
 
@@ -56,6 +64,12 @@ class ProjectCreateRequest(BaseModel):
     enable_captions: bool = Field(
         default=True,
         description="Enable word-by-word captions for shorts",
+    )
+
+    # Voice customization for single-narrator mode
+    voice_preference: Optional[VoicePreference] = Field(
+        default=None,
+        description="Custom voice settings for single-narrator mode. Bypasses LLM casting.",
     )
 
 

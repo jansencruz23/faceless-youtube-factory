@@ -118,6 +118,7 @@ async def run_pipeline(
     background_music_url: str = None,
     music_volume: float = 0.3,
     enable_captions: bool = True,
+    voice_preference: dict = None,
 ) -> GraphState:
     """
     Execute the video generation pipeline.
@@ -135,6 +136,7 @@ async def run_pipeline(
         background_video_url: Video background for shorts
         background_music_url: Background music URL
         music_volume: Volume for background music (0-1)
+        voice_preference: User voice preference to bypass LLM casting
 
     Returns:
         Final GraphState with all generated data
@@ -162,6 +164,7 @@ async def run_pipeline(
         "background_music_url": background_music_url,
         "music_volume": music_volume,
         "enable_captions": enable_captions,
+        "voice_preference": voice_preference,
         "script_json": None,
         "cast_list": None,
         "image_files": [],

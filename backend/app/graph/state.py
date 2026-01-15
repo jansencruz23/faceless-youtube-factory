@@ -54,3 +54,4 @@ class GraphState(TypedDict):
     background_music_url: Optional[str]
     music_volume: float
     enable_captions: bool
+    voice_preference: Optional[Dict[str, str]]  # User voice preference if specified

@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Smartphone, Folder } from "lucide-react";
+import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Smartphone, Folder, Mic } from "lucide-react";
 
 type ImageMode = "per_scene" | "single" | "upload" | "none";
 type VideoFormat = "horizontal" | "vertical";
@@ -46,6 +46,12 @@ export default function NewProjectPage() {
     const [isUploading, setIsUploading] = useState(false);
     const [uploadingType, setUploadingType] = useState<string | null>(null);
 
+    // Voice customization
+    const [useCustomVoice, setUseCustomVoice] = useState(false);
+    const [selectedVoice, setSelectedVoice] = useState<string>("en-US-GuyNeural");
+    const [voicePitch, setVoicePitch] = useState(0); // -10 to +10
+    const [voiceRate, setVoiceRate] = useState(0); // -20 to +30
+
     const { data: ytConnection } = useQuery({
         queryKey: ["youtube-connection"],
         queryFn: () => api.getYouTubeConnection(),
@@ -59,6 +65,11 @@ export default function NewProjectPage() {
     const { data: musicPresetsData } = useQuery({
         queryKey: ["preset-music"],
         queryFn: () => api.getPresetMusic(),
+    });
+
+    const { data: voicesData } = useQuery({
+        queryKey: ["voices"],
+        queryFn: () => api.listVoices(),
     });
 
     // Fetch all projects to get existing categories for suggestions
@@ -173,6 +184,11 @@ export default function NewProjectPage() {
             background_music_url: uploadedMusicUrl || undefined,
             music_volume: musicVolume,
             enable_captions: videoFormat === "vertical" ? enableCaptions : undefined,
+            voice_preference: useCustomVoice ? {
+                voice_id: selectedVoice,
+                pitch: voicePitch >= 0 ? `+${voicePitch}Hz` : `${voicePitch}Hz`,
+                rate: voiceRate >= 0 ? `+${voiceRate}%` : `${voiceRate}%`,
+            } : undefined,
         });
     };
 
@@ -251,8 +267,8 @@ export default function NewProjectPage() {
                                             type="button"
                                             onClick={() => setCategory(category === cat ? "" : cat)}
                                             className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium transition-colors ${category === cat
-                                                    ? "bg-primary text-primary-foreground"
-                                                    : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
+                                                ? "bg-primary text-primary-foreground"
+                                                : "bg-secondary text-secondary-foreground hover:bg-secondary/80"
                                                 }`}
                                         >
                                             {cat}
@@ -628,6 +644,98 @@ export default function NewProjectPage() {
                                 </div>
                             </>
                         )}
+
+                        {/* Voice Customization */}
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 p-3 rounded-lg bg-secondary/30">
+                                <input
+                                    type="checkbox"
+                                    id="useCustomVoice"
+                                    checked={useCustomVoice}
+                                    onChange={(e) => setUseCustomVoice(e.target.checked)}
+                                    className="h-4 w-4 rounded border-border"
+                                />
+                                <label htmlFor="useCustomVoice" className="flex-1 cursor-pointer">
+                                    <span className="font-medium text-sm flex items-center gap-2">
+                                        <Mic className="h-4 w-4" />
+                                        Use Custom Narrator Voice
+                                    </span>
+                                    <p className="text-xs text-muted-foreground">
+                                        {useCustomVoice
+                                            ? "Use custom voice settings for all characters"
+                                            : "AI will select appropriate voices for each character"}
+                                    </p>
+                                </label>
+                            </div>
+
+                            {useCustomVoice && (
+                                <div className="space-y-4 p-4 rounded-lg border border-border bg-card">
+                                    {/* Voice Selector */}
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium">Voice</label>
+                                        <select
+                                            value={selectedVoice}
+                                            onChange={(e) => setSelectedVoice(e.target.value)}
+                                            className="w-full p-2 rounded-lg border border-border bg-background text-sm"
+                                        >
+                                            {voicesData?.voices?.map((voice) => (
+                                                <option key={voice.voice_id} value={voice.voice_id}>
+                                                    {voice.name} ({voice.locale}, {voice.gender})
+                                                </option>
+                                            )) || (
+                                                    <option value="en-US-GuyNeural">Guy (en-US, Male)</option>
+                                                )}
+                                        </select>
+                                    </div>
+
+                                    {/* Pitch Slider */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-sm font-medium">Pitch</label>
+                                            <span className="text-xs text-muted-foreground">
+                                                {voicePitch >= 0 ? `+${voicePitch}Hz` : `${voicePitch}Hz`}
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="-10"
+                                            max="10"
+                                            step="1"
+                                            value={voicePitch}
+                                            onChange={(e) => setVoicePitch(parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Deeper</span>
+                                            <span>Higher</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Rate Slider */}
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label className="text-sm font-medium">Speed</label>
+                                            <span className="text-xs text-muted-foreground">
+                                                {voiceRate >= 0 ? `+${voiceRate}%` : `${voiceRate}%`}
+                                            </span>
+                                        </div>
+                                        <input
+                                            type="range"
+                                            min="-20"
+                                            max="30"
+                                            step="5"
+                                            value={voiceRate}
+                                            onChange={(e) => setVoiceRate(parseInt(e.target.value))}
+                                            className="w-full"
+                                        />
+                                        <div className="flex justify-between text-xs text-muted-foreground">
+                                            <span>Slower</span>
+                                            <span>Faster</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
 
                         {/* Auto-upload option */}
                         {ytConnection?.connected && (

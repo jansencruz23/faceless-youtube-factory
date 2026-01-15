@@ -92,6 +92,7 @@ async def run_pipeline_background(
     background_music_url: str = None,
     music_volume: float = 0.3,
     enable_captions: bool = True,
+    voice_preference: dict = None,
 ):
     """Background task to run the generation pipeline."""
     try:
@@ -109,6 +110,7 @@ async def run_pipeline_background(
             background_music_url=background_music_url,
             music_volume=music_volume,
             enable_captions=enable_captions,
+            voice_preference=voice_preference,
         )
     except Exception as e:
         logger.error(
@@ -138,6 +140,9 @@ async def create_project(
         "background_music_url": request.background_music_url,
         "music_volume": request.music_volume,
         "enable_captions": request.enable_captions,
+        "voice_preference": request.voice_preference.model_dump()
+        if request.voice_preference
+        else None,
     }
     project = await project_crud.create(
         session=session,
@@ -167,6 +172,9 @@ async def create_project(
         background_music_url=request.background_music_url,
         music_volume=request.music_volume,
         enable_captions=request.enable_captions,
+        voice_preference=request.voice_preference.model_dump()
+        if request.voice_preference
+        else None,
     )
 
     logger.info("Project created", project_id=str(project.id), user_id=str(user_id))

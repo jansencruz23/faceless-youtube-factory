@@ -86,6 +86,11 @@ export async function createProject(data: {
     background_music_url?: string;
     music_volume?: number;
     enable_captions?: boolean;
+    voice_preference?: {
+        voice_id: string;
+        pitch: string;
+        rate: string;
+    };
 }, token?: string | null): Promise<Project> {
     return fetchAPI("/api/v1/projects", {
         method: "POST",

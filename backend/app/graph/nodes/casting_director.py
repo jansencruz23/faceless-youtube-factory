@@ -254,26 +254,45 @@ async def casting_director_node(state: GraphState) -> GraphState:
     speakers = list(speaker_data.keys())
     cast_assignments = None
 
-    try:
-        # Use LLM to select voices
-        cast_assignments = await _llm_select_voices(speaker_data)
+    # Check if user specified a voice preference (single-narrator mode)
+    voice_preference = state.get("voice_preference")
+    if voice_preference:
+        # Apply user's voice preference to all speakers
+        cast_assignments = {
+            speaker: {
+                "voice_id": voice_preference["voice_id"],
+                "pitch": voice_preference.get("pitch", "+0Hz"),
+                "rate": voice_preference.get("rate", "+0%"),
+            }
+            for speaker in speakers
+        }
+        logger.info(
+            "Using user-specified voice preference",
+            project_id=state["project_id"],
+            voice_id=voice_preference["voice_id"],
+            speaker_count=len(speakers),
+        )
+    else:
+        # Use LLM to select voices for multi-character scripts
+        try:
+            cast_assignments = await _llm_select_voices(speaker_data)
 
-        if cast_assignments:
-            logger.info(
-                "LLM casting completed",
-                project_id=state["project_id"],
-                characters=list(cast_assignments.keys()),
-            )
+            if cast_assignments:
+                logger.info(
+                    "LLM casting completed",
+                    project_id=state["project_id"],
+                    characters=list(cast_assignments.keys()),
+                )
 
-    except Exception as e:
-        error_msg = f"LLM casting failed: {str(e)}"
-        logger.warning(error_msg, project_id=state["project_id"])
-        state["errors"].append(error_msg)
+        except Exception as e:
+            error_msg = f"LLM casting failed: {str(e)}"
+            logger.warning(error_msg, project_id=state["project_id"])
+            state["errors"].append(error_msg)
 
-    # If LLM failed or returned empty, use fallback
-    if not cast_assignments:
-        logger.info("Using fallback casting", project_id=state["project_id"])
-        cast_assignments = _fallback_casting(speakers)
+        # If LLM failed or returned empty, use fallback
+        if not cast_assignments:
+            logger.info("Using fallback casting", project_id=state["project_id"])
+            cast_assignments = _fallback_casting(speakers)
 
     # Ensure all speakers have an assignment
     for speaker in speakers:
