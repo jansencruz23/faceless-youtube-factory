@@ -87,6 +87,11 @@ class Settings(BaseSettings):
     image_num_steps: int = 20
     enable_image_generation: bool = True
 
+    # TTS Settings
+    default_tts_provider: str = "chatterbox"  # "edge_tts" or "chatterbox"
+    chatterbox_device: str = "cuda"  # "cuda" or "cpu"
+    chatterbox_model: str = "turbo"  # "turbo", "standard", or "multilingual"
+
     @property
     def async_database_url(self) -> str:
         """Ensure the database URL uses asyncpg driver."""
