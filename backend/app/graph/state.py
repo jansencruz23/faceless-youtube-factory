@@ -55,3 +55,6 @@ class GraphState(TypedDict):
     music_volume: float
     enable_captions: bool
     voice_preference: Optional[Dict[str, str]]  # User voice preference if specified
+
+    # TTS provider selection
+    tts_provider: str  # "edge_tts" or "chatterbox"

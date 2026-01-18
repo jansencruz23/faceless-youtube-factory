@@ -72,6 +72,12 @@ class ProjectCreateRequest(BaseModel):
         description="Custom voice settings for single-narrator mode. Bypasses LLM casting.",
     )
 
+    # TTS provider selection
+    tts_provider: Literal["edge_tts", "chatterbox"] = Field(
+        default="chatterbox",
+        description="TTS provider: edge_tts (fast, many voices) or chatterbox (high quality)",
+    )
+
 
 class ProjectResponse(BaseModel):
     """Basic project response."""
