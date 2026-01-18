@@ -91,6 +91,7 @@ export async function createProject(data: {
         pitch: string;
         rate: string;
     };
+    tts_provider?: "edge_tts" | "chatterbox";
 }, token?: string | null): Promise<Project> {
     return fetchAPI("/api/v1/projects", {
         method: "POST",

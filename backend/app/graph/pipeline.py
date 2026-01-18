@@ -119,6 +119,7 @@ async def run_pipeline(
     music_volume: float = 0.3,
     enable_captions: bool = True,
     voice_preference: dict = None,
+    tts_provider: str = None,
 ) -> GraphState:
     """
     Execute the video generation pipeline.
@@ -137,6 +138,7 @@ async def run_pipeline(
         background_music_url: Background music URL
         music_volume: Volume for background music (0-1)
         voice_preference: User voice preference to bypass LLM casting
+        tts_provider: TTS provider to use (edge_tts or chatterbox)
 
     Returns:
         Final GraphState with all generated data
@@ -165,6 +167,7 @@ async def run_pipeline(
         "music_volume": music_volume,
         "enable_captions": enable_captions,
         "voice_preference": voice_preference,
+        "tts_provider": tts_provider,
         "script_json": None,
         "cast_list": None,
         "image_files": [],
