@@ -34,3 +34,10 @@ class PrivacyStatus(str, Enum):
     PUBLIC = "public"
     PRIVATE = "private"
     UNLISTED = "unlisted"
+
+
+class TTSProvider(str, Enum):
+    """Text-to-Speech provider options."""
+
+    EDGE_TTS = "edge_tts"
+    CHATTERBOX = "chatterbox"
