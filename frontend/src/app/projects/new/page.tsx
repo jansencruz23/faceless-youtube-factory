@@ -13,6 +13,7 @@ import { Loader2, Sparkles, Youtube, Image, Upload, X, Video, Music, Monitor, Sm
 type ImageMode = "per_scene" | "single" | "upload" | "none";
 type VideoFormat = "horizontal" | "vertical";
 type BackgroundMode = "preset" | "upload" | "image" | "per_scene" | "none";
+type TTSProvider = "edge_tts" | "chatterbox";
 
 export default function NewProjectPage() {
     const router = useRouter();
@@ -51,6 +52,9 @@ export default function NewProjectPage() {
     const [selectedVoice, setSelectedVoice] = useState<string>("en-US-GuyNeural");
     const [voicePitch, setVoicePitch] = useState(0); // -10 to +10
     const [voiceRate, setVoiceRate] = useState(0); // -20 to +30
+
+    // TTS Provider selection (chatterbox is default)
+    const [ttsProvider, setTtsProvider] = useState<TTSProvider>("chatterbox");
 
     const { data: ytConnection } = useQuery({
         queryKey: ["youtube-connection"],
@@ -189,6 +193,7 @@ export default function NewProjectPage() {
                 pitch: voicePitch >= 0 ? `+${voicePitch}Hz` : `${voicePitch}Hz`,
                 rate: voiceRate >= 0 ? `+${voiceRate}%` : `${voiceRate}%`,
             } : undefined,
+            tts_provider: ttsProvider,
         });
     };
 
@@ -644,6 +649,43 @@ export default function NewProjectPage() {
                                 </div>
                             </>
                         )}
+
+                        {/* TTS Provider Selection */}
+                        <div className="space-y-3">
+                            <label className="text-sm font-medium flex items-center gap-2">
+                                <Mic className="h-4 w-4" />
+                                Voice Engine
+                            </label>
+                            <div className="grid grid-cols-2 gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => setTtsProvider("chatterbox")}
+                                    className={`p-4 rounded-lg border-2 transition-colors text-left ${ttsProvider === "chatterbox"
+                                        ? "border-primary bg-primary/10"
+                                        : "border-border hover:border-primary/50"
+                                        }`}
+                                >
+                                    <span className="font-medium block">Chatterbox</span>
+                                    <span className="text-xs text-muted-foreground">High quality, neural TTS</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setTtsProvider("edge_tts")}
+                                    className={`p-4 rounded-lg border-2 transition-colors text-left ${ttsProvider === "edge_tts"
+                                        ? "border-primary bg-primary/10"
+                                        : "border-border hover:border-primary/50"
+                                        }`}
+                                >
+                                    <span className="font-medium block">Edge TTS</span>
+                                    <span className="text-xs text-muted-foreground">Fast, many voice options</span>
+                                </button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                                {ttsProvider === "chatterbox"
+                                    ? "Chatterbox uses AI for natural, expressive speech. Requires GPU."
+                                    : "Edge TTS is fast and supports many languages and voices."}
+                            </p>
+                        </div>
 
                         {/* Voice Customization */}
                         <div className="space-y-3">
