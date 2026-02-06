@@ -33,6 +33,7 @@ venv/
 *.csv
 *.json
 *.txt
+!**/requirements.txt
 *.sqlite
 *.db
 
