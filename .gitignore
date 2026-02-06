@@ -32,6 +32,8 @@ venv/
 # Data files (if not meant to be versioned)
 *.csv
 *.json
+!**/package.json
+!**/package-lock.json
 *.txt
 !**/requirements.txt
 *.sqlite
