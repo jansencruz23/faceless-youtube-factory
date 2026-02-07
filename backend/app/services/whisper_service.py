@@ -25,7 +25,7 @@ def get_whisper_model():
 
             # Use 'small' for better multilingual accuracy (Filipino, etc.)
             # Can be overridden via WHISPER_MODEL env var
-            model_size = os.environ.get("WHISPER_MODEL", "small")
+            model_size = os.environ.get("WHISPER_MODEL", "medium")
             logger.info(f"Loading Whisper model ({model_size}, CPU mode)...")
             _whisper_model = WhisperModel(
                 model_size,  # 'small' is better for non-English

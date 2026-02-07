@@ -1,6 +1,7 @@
 """
 AudioGenerator Node - Generates audio for each script scene.
 """
+
 from typing import Dict, Any
 from uuid import uuid4
 
@@ -16,18 +17,18 @@ logger = get_logger(__name__)
 async def audio_generator_node(state: GraphState) -> GraphState:
     """
     Generate audio files for each scene in the script.
-    
+
     Uses edge-tts with the voice settings from cast assignments.
     Tracks failed scenes by index to maintain scene/audio alignment.
-    
+
     Updates:
     - audio_files: List of paths to generated audio files (with None for failures)
     - progress: Incremented per scene, reaches 0.6 on completion
     """
     logger.info("AudioGenerator node started", project_id=state["project_id"])
-    
+
     state["current_step"] = "generating_audio"
-    
+
     script_json = state["script_json"]
     cast_list = state["cast_list"]
     scenes = script_json.get("scenes", [])
@@ -36,11 +37,11 @@ async def audio_generator_node(state: GraphState) -> GraphState:
     audio_files = []
     successful_count = 0
     scene_count = len(scenes)
-    
+
     logger.info(
         "Starting audio generation",
         project_id=state["project_id"],
-        total_scenes=scene_count
+        total_scenes=scene_count,
     )
 
     async with get_session_context() as session:
@@ -49,23 +50,20 @@ async def audio_generator_node(state: GraphState) -> GraphState:
         for i, scene in enumerate(scenes):
             speaker = scene.get("speaker", "Unknown")
             line = scene.get("line", "")
-            
+
             # Skip empty lines
             if not line or not line.strip():
                 logger.warning(
-                    "Empty line in scene, skipping",
-                    scene_index=i,
-                    speaker=speaker
+                    "Empty line in scene, skipping", scene_index=i, speaker=speaker
                 )
                 audio_files.append(None)
                 continue
-            
+
             # Get voice settings for this speaker
-            voice_settings = cast_list.get(speaker, {
-                "voice_id": "en-US-AriaNeural",
-                "pitch": "+0Hz",
-                "rate": "+0%"
-            })
+            voice_settings = cast_list.get(
+                speaker,
+                {"voice_id": "en-US-AriaNeural", "pitch": "+0Hz", "rate": "+0%"},
+            )
 
             try:
                 # Generate audio file
@@ -75,27 +73,24 @@ async def audio_generator_node(state: GraphState) -> GraphState:
                     text=line,
                     voice_id=voice_settings["voice_id"],
                     rate=voice_settings.get("rate", "+0%"),
-                    pitch=voice_settings.get("pitch", "+0Hz")
+                    pitch=voice_settings.get("pitch", "+0Hz"),
                 )
-                
+
                 audio_files.append(audio_path)
                 successful_count += 1
-                
+
                 # Create asset record
                 asset = Asset(
                     id=uuid4(),
                     project_id=state["project_id"],
                     asset_type=AssetType.AUDIO,
                     file_path=audio_path,
-                    character_name=speaker
+                    character_name=speaker,
                 )
                 session.add(asset)
-                
+
                 logger.debug(
-                    "Scene audio generated",
-                    scene=i,
-                    speaker=speaker,
-                    path=audio_path
+                    "Scene audio generated", scene=i, speaker=speaker, path=audio_path
                 )
 
             except Exception as e:
@@ -108,13 +103,23 @@ async def audio_generator_node(state: GraphState) -> GraphState:
             # Update progress (0.3 to 0.6 range)
             state["progress"] = 0.3 + (0.3 * (i + 1) / scene_count)
 
-        # Update project status
+        # Filter out None values to count successful files
+        valid_audio_files = [p for p in audio_files if p is not None]
+
+        # Update project status based on audio generation success
         from uuid import UUID as UUIDType
+
         project = await session.get(Project, UUIDType(state["project_id"]))
         if project:
-            project.status = ProjectStatus.GENERATING_VIDEO
+            if valid_audio_files:
+                # At least one audio file generated - proceed to video
+                project.status = ProjectStatus.GENERATING_VIDEO
+            else:
+                # No audio files generated - mark as failed
+                project.status = ProjectStatus.FAILED
+                project.error_message = "Audio generation failed for all scenes. Please try again or check TTS service."
             session.add(project)
-        
+
         await session.commit()
 
     # Filter out None values for the video composer
@@ -125,7 +130,7 @@ async def audio_generator_node(state: GraphState) -> GraphState:
         if path is not None:
             valid_audio_files.append(path)
             valid_indices.append(i)
-    
+
     state["audio_files"] = valid_audio_files
     state["audio_scene_indices"] = valid_indices  # Track which scenes have audio
     state["progress"] = 0.6
@@ -135,15 +140,16 @@ async def audio_generator_node(state: GraphState) -> GraphState:
         project_id=state["project_id"],
         successful=successful_count,
         failed=scene_count - successful_count,
-        total=scene_count
+        total=scene_count,
     )
-    
+
     return state
+
 
 def should_continue_after_audio(state: GraphState) -> str:
     """
     Conditional edge: Decide next step after audio generation.
-    
+
     Returns:
     - "video_composer" if at least one audio file was generated
     - "end" if no audio files (complete failure)
